@@ -74,8 +74,9 @@ class AboutView extends StatelessWidget {
             title: 'Github Releases',
             icon: Icons.star,
             external: true,
+            // [Gamebox] 同步上游时把这个链接改成你自己的仓库。
             onTap: () => globalState.openUrl(
-              'https://github.com/appshubcc/Bettbox',
+              'https://github.com/mouren1988/Bettbox',
             ),
           ),
           right: _LinkTile(
@@ -110,7 +111,13 @@ class AboutView extends StatelessWidget {
   }
 
   List<Widget> _buildContributorsSection() {
-    // [Gamebox] 只保留仓库头像。上游是一批贡献者头像并随机排序。
+    // ===== [Gamebox] 关于页 → 其他贡献者 =====
+    // 上游：随机滚动显示一批开源贡献者头像。
+    // Gamebox：只显示仓库维护者 mouren1988 的头像（_repoAvatar）。
+    // 头像文件位置：assets/images/avatars/mouren1988.jpg
+    // 同步上游时如果把头像换成自己的，**必须用二进制方式提交**（不要用
+    // PowerShell `Set-Content` / `Out-File`，会把文件当 UTF-8 文本重写，
+    // 高位字节全部被替换为 U+FFFD，导致 CircleAvatar 加载失败回退到绿底）。
     return generateSection(
       separated: false,
       title: appLocalizations.otherContributors,

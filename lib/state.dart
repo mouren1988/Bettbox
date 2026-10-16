@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -657,9 +657,13 @@ class GlobalState {
     }
 
     if (config.appSetting.locale == null) {
-      final systemLocale = utils.getSystemLocale();
-      config = config.copyWith(
-        appSetting: config.appSetting.copyWith(locale: systemLocale.toString()),
+       // [Gamebox] 强制写死 zh-Hans-CN。上游这里会用 systemLocale，OS 是英文时
+      // 会让首启英文界面。我们不跟系统，固定中文。
+      // 配套：application.dart 的 MaterialApp.locale 也写死 zh-Hans-CN，
+      // 即使这一行被绕开，启动后 UI 也仍是中文。
+          ),
+          ).toString(),
+        ),
       );
       preferences.saveConfig(config);
       this.config = config;

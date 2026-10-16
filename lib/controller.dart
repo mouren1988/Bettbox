@@ -1205,6 +1205,10 @@ class AppController {
         return;
       }
       const String assetSuffix = String.fromEnvironment('APP_ASSET_SUFFIX');
+      // [Gamebox] 检查更新跳转。$repository 来自 lib/common/constant.dart，
+      // 当前指向 mouren1988/Bettbox（你的 fork）。同步上游时核对：
+      // 1) 改成你自己的 GitHub 仓库（fork 或 Gamebox 专用仓库）；
+      // 2) 不要无脑恢复成 appshubcc/Bettbox，那查的是上游版本号，跟你 Gamebox 没关系。
       String downloadUrl = 'https://github.com/$repository/releases/latest';
 
       if (assetSuffix.isNotEmpty) {

@@ -256,6 +256,10 @@ class Request {
 
   Future<Map<String, dynamic>?> checkForUpdate() async {
     try {
+      // [Gamebox] 检查更新请求的 GitHub 仓库。$repository 在
+      // lib/common/constant.dart 定义（mouren1988/Bettbox）。
+      // 同步上游时务必确认这里指向你自己的 fork / Gamebox 专用仓库，
+      // 否则会去查 appshubcc/Bettbox 的 release，永远显示有新版本。
       final t = DateTime.now().millisecondsSinceEpoch;
       final response = await _dio.get(
         'https://github.com/$repository/releases/latest?t=$t',

@@ -43,7 +43,10 @@ const configKey = 'config';
 const customSidebarIconKey = 'custom_sidebar_icon';
 const customDashboardTitleKey = 'custom_dashboard_title';
 const double dialogCommonWidth = 300;
-const repository = 'appshubcc/Bettbox';
+// [Gamebox] 检查更新用的仓库。同步上游时把这里改成你自己的 GitHub 仓库（fork 或
+// Gamebox 专用仓库）。当前指向 mouren1988/Bettbox（你的 fork）。
+// 上游 Bettbox 默认值是 appshubcc/Bettbox，请不要无脑同步。
+const repository = 'mouren1988/Bettbox';
 const ipInfoToken = String.fromEnvironment('IPINFO_TOKEN', defaultValue: '');
 const defaultExternalController = '127.0.0.1:9090';
 const maxMobileWidth = 600;

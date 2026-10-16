@@ -443,7 +443,7 @@ _ProxiesStyle _$ProxiesStyleFromJson(Map<String, dynamic> json) =>
             _$DelayAnimationTypeEnumMap,
             json['delayAnimation'],
           ) ??
-          DelayAnimationType.chasingDots,
+          DelayAnimationType.none,
       syncDelayAnimation: json['syncDelayAnimation'] as bool? ?? true,
       iconMap:
           (json['iconMap'] as Map<String, dynamic>?)?.map(

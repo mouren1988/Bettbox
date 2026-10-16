@@ -1,4 +1,4 @@
-// ignore_for_file: invalid_annotation_target
+﻿// ignore_for_file: invalid_annotation_target
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
@@ -374,7 +374,7 @@ List<String> bypassDomainSafeFromJson(List<dynamic>? bypassDomain) {
 @freezed
 abstract class NetworkProps with _$NetworkProps {
   const factory NetworkProps({
-    // [Gamebox] 桌面端「内核配�?> 网络」系统代理默认关闭。上游默�?true。同步时保留 false�?
+    // [Gamebox] 桌面端「内核配置 → 网络」系统代理默认关闭。上游默认 true。同步时保留 false。
     @Default(false) bool systemProxy,
     @Default(defaultBypassDomain)
     @JsonKey(fromJson: bypassDomainSafeFromJson)
@@ -405,8 +405,10 @@ abstract class ProxiesStyle with _$ProxiesStyle {
     @Default(ProxiesLayout.standard) ProxiesLayout layout,
     @Default(ProxiesIconStyle.none) ProxiesIconStyle iconStyle,
     @Default(ProxyCardType.shrink) ProxyCardType cardType,
-    // [Gamebox] 延迟动画默认开启双星追逐。上游默认 none（关闭）。
-    @Default(DelayAnimationType.chasingDots) DelayAnimationType delayAnimation,
+    // [Gamebox] 延迟动画默认值。UI 上第一个选项显示为「默认」，对应
+    // DelayAnimationType.none（即不显示任何自定义动画，保留原生进度条）。
+    // 同步上游时若 none 的中文翻译变了，这里只跟枚举值，不跟文案。
+    @Default(DelayAnimationType.none) DelayAnimationType delayAnimation,
     @Default(true) bool syncDelayAnimation,
     @Default({}) Map<String, String> iconMap,
     @Default(250) int concurrencyLimit,

@@ -9,6 +9,11 @@ part 'generated/clash_config.g.dart';
 
 typedef HostsMap = Map<String, String>;
 
+// [Gamebox] Mihomo HTTP 全局 User-Agent 默认值。
+// 内核转发 HTTP 时会拿这个串代替原 UA，让代理后的目标站点能识别客户端。
+// 同步上游时如果改了 major 版本号，这里也要跟着改。
+const defaultGlobalUa = 'Gamebox/1.19.6';
+
 const defaultClashConfig = ClashConfig();
 
 const defaultTun = Tun();
@@ -761,7 +766,11 @@ abstract class ClashConfig with _$ClashConfig {
     GeodataLoader geodataLoader,
     @Default([]) @JsonKey(name: 'proxy-groups') List<ProxyGroup> proxyGroups,
     @Default([]) List<String> rule,
-    @JsonKey(name: 'global-ua') String? globalUa,
+    // [Gamebox] 默认 UA = 'Gamebox/1.19.6'。同步上游时 major 版本号变化要同步改
+    // defaultGlobalUa 常量。
+    @Default(defaultGlobalUa)
+    @JsonKey(name: 'global-ua')
+    String? globalUa,
     // [Gamebox] 外部控制默认开启，密码为空。
     @Default(ExternalControllerStatus.open)
     @JsonKey(name: 'external-controller')

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
+import 'package:bett_box/l10n/l10n.dart';
 import 'package:bett_box/models/models.dart';
 import 'package:bett_box/providers/providers.dart';
 import 'package:bett_box/state.dart';
@@ -310,7 +311,16 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     }
 
     items.addAll([
-      // [Gamebox] 语言、备份与恢复已固定/隐藏，不出现在搜索项中。
+      // [Gamebox] 语言切换：默认固定简体中文（见 application.dart MaterialApp.locale），
+      // 但保留切换入口（_LocaleItem），用户可以临时切到别的语言，下次启动仍会回到简体中文。
+      _SearchItem(
+        title: appLocalizations.language,
+        subtitle: appLocalizations.language,
+        category: settingsCategory,
+        leading: const Icon(Icons.language_outlined),
+        onTap: (context, _) =>
+            _pushPage(context, appLocalizations.language, const _LocaleItem()),
+      ),
       _SearchItem(
         title: appLocalizations.theme,
         subtitle: appLocalizations.themeDesc,
@@ -319,6 +329,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         onTap: (context, _) =>
             _pushPage(context, appLocalizations.theme, const ThemeView()),
       ),
+      // [Gamebox] 备份与恢复已隐藏（悬浮面板、设置列表、搜索项都不再出现）。
       if (system.isDesktop)
         _SearchItem(
           title: appLocalizations.hotkeyManagement,
@@ -1476,7 +1487,10 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         context,
         title: appLocalizations.settings,
         items: [
-          // [Gamebox] 语言和备份与恢复已隐藏：语言固定简体中文，备份与恢复整段不再出现。
+          // [Gamebox] 备份与恢复整段已隐藏（悬浮面板、设置列表、搜索项都不出现）。
+          // 语言入口保留：默认显示简体中文（MaterialApp.locale 写死），
+          // 这里只是给用户临时切换调试用。
+          _LocaleItem(),
           _ThemeItem(),
           if (system.isDesktop) _HotkeyItem(),
           if (system.isWindows) _LoopbackItem(),
@@ -1510,6 +1524,75 @@ class _ToolViewState extends ConsumerState<ToolsView> {
             top: 8 + rise,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LocaleItem extends ConsumerWidget {
+  // [Gamebox] 语言切换入口。
+  // - MaterialApp.locale 已写死 zh-Hans-CN，冷启动永远简体中文。
+  // - 用户在这里切换后只是改了 appSetting.locale，下次启动会被覆盖。
+  // - 保留入口是为了方便临时切到英语/俄语等调试界面，不会持久化。
+  const _LocaleItem();
+
+  static final List<Locale> _localeOptions = _getOrderedLocales();
+  static const Map<String, String> _nativeLocaleNames = {
+    'zh_CN': '简体中文',
+    'zh_TC': '繁體中文',
+    'en': 'English',
+    'ru': 'Русский',
+    'fa': 'فارسی',
+    'ja': '日本語',
+    'ko': '한국어',
+  };
+
+  static List<Locale> _getOrderedLocales() {
+    final priority = ['zh_CN', 'zh_TC', 'en', 'ru', 'fa', 'ja', 'ko'];
+    final locales = List<Locale>.from(
+      AppLocalizations.delegate.supportedLocales,
+    );
+    locales.sort((a, b) {
+      final aKey = a.toString();
+      final bKey = b.toString();
+      final aIndex = priority.indexOf(aKey);
+      final bIndex = priority.indexOf(bKey);
+      if (aIndex != -1 && bIndex != -1) return aIndex.compareTo(bIndex);
+      if (aIndex != -1) return -1;
+      if (bIndex != -1) return 1;
+      return aKey.compareTo(bKey);
+    });
+    return locales;
+  }
+
+  String _getLocaleString(Locale locale) {
+    return _nativeLocaleNames[locale.toString()] ?? locale.toString();
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locale = ref.watch(
+      appSettingProvider.select((state) => state.locale),
+    );
+    final currentLocale =
+        utils.getLocaleForString(locale) ?? utils.getSystemLocale();
+    return ListItem<Locale>.options(
+      leading: const Icon(Icons.language_outlined),
+      title: Text(appLocalizations.language),
+      subtitle: Text(_getLocaleString(currentLocale)),
+      delegate: OptionsDelegate(
+        title: appLocalizations.language,
+        options: _localeOptions,
+        onChanged: (Locale? locale) {
+          if (locale == null) return;
+          ref
+              .read(appSettingProvider.notifier)
+              .updateState(
+                (state) => state.copyWith(locale: locale.toString()),
+              );
+        },
+        textBuilder: (locale) => _getLocaleString(locale),
+        value: currentLocale,
       ),
     );
   }

@@ -525,7 +525,7 @@ _ClashConfig _$ClashConfigFromJson(Map<String, dynamic> json) => _ClashConfig(
   rule:
       (json['rule'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const [],
-  globalUa: json['global-ua'] as String?,
+  globalUa: json['global-ua'] as String? ?? defaultGlobalUa,
   externalController:
       $enumDecodeNullable(
         _$ExternalControllerStatusEnumMap,

@@ -435,11 +435,17 @@ class ApplicationState extends ConsumerState<Application>
               },
               scrollBehavior: BaseScrollBehavior(),
               title: appName,
-              // [Gamebox] 界面固定简体中文。上游使用已保存语言，没有则跟随系统。
-              // [Gamebox] material_ui 1.6.0 的 GlobalMaterialLocalizations.delegate 用
-              // locale.scriptCode 找翻译，'zh'/'CN' 缺 scriptCode → 返回 null → TextField 报
-              // "No MaterialLocalizations found"。补上 scriptCode: 'Hans' 才能命中
-              // MaterialLocalizationZhHans。
+              // ===== [Gamebox] 语言固定简体中文 =====
+              // 行为：无论系统 locale 是什么、无论 appSetting.locale 是什么，
+              // 冷启动 MaterialApp.locale 始终是 zh-Hans-CN，界面永远是简体中文。
+              // 用户在「设置 → 语言」里切换只是改了 appSetting.locale（用于本会话临时调试），
+              // 不会持久覆盖下次启动的 zh-Hans-CN。
+              //
+              // scriptCode: 'Hans' 是关键：material_ui 1.6.0 的 GlobalMaterialLocalizations
+              // 用 locale.scriptCode 找翻译；只写 languageCode: 'zh' / countryCode: 'CN'
+              // 时 scriptCode 是 null，TextField 报 "No MaterialLocalizations found"。
+              // 同步上游时如果 material_ui 升到 1.7+ 修了 scriptCode 推断逻辑，
+              // 这里仍然保留 Hans（向后兼容）。
               locale: const Locale.fromSubtags(
                 languageCode: 'zh',
                 scriptCode: 'Hans',
