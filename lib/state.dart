@@ -81,6 +81,14 @@ class GlobalState {
   final Lock _scriptEvaluateLock = Lock();
   bool isInit = false;
 
+  // [Gamebox] Panel login fields
+  final panelUnlocked = ValueNotifier<bool>(false);
+  final panelAccountName = ValueNotifier<String>('');
+  Future<void> Function()? openMainAfterLogin;
+  Future<void> Function()? clearPanelSubscriptions;
+  bool mainStarted = false;
+  bool skipPanelAutoLogin = false;
+
   bool get hasMediaUnlockWidget {
     final widgets = system.isAndroid
         ? config.appSetting.mobileDashboardWidgets
@@ -629,6 +637,17 @@ class GlobalState {
     launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
+  // [Gamebox] Open README.html in the install directory. Upstream opens Github Releases.
+  Future<void> openUserManual() async {
+    final manualPath =
+        '${appPath.executableDirPath}${Platform.pathSeparator}README.html';
+    if (!File(manualPath).existsSync()) {
+      showNotifier('未找到使用说明文件');
+      return;
+    }
+    launchUrl(Uri.file(manualPath), mode: LaunchMode.externalApplication);
+  }
+
   Future<void> migrateOldData(Config config) async {
     final clashConfig = await preferences.getClashConfig();
     if (clashConfig != null) {
@@ -961,7 +980,7 @@ class GlobalState {
       'providers-path': await appPath.getProvidersDirPath(profile.id),
       'node-exclude-filter': config.nodeExcludeFilter,
       'health-check-timeout': config.healthCheckTimeout,
-      'override-rules': overrideData.enable
+      'override-rules': overrideData.enable && !scriptActive
           ? {
               'override': overrideData.rule.type == OverrideRuleType.override,
               'rules': overrideData.runningRule,
@@ -991,49 +1010,12 @@ class GlobalState {
     };
   }
 
-  Future<Map<String, dynamic>?> _readScriptedConfig(Profile profile) async {
-    final path = await _writeScriptedConfig(profile);
-    if (path.isEmpty) return null;
-    final file = File(path);
-    try {
-      final content = await file.readAsString();
-      return await Isolate.run(
-        () => Map<String, dynamic>.from(json.decode(content) as Map),
-      );
-    } finally {
-      if (await file.exists()) {
-        await file.delete();
-      }
-    }
-  }
-
-  Future<Map<String, dynamic>> getProfileConfig(
-    String profileId, {
-    bool effective = false,
-  }) async {
+  Future<Map<String, dynamic>> getProfileConfig(String profileId) async {
     final profile = config.profiles.getProfile(profileId);
-    if (effective && profile != null) {
-      final scripted = await _readScriptedConfig(profile);
-      if (scripted != null) return scripted;
-    }
     final ageSecretKey = profile?.ageSecretKey;
-    final disabledGroups = effective && profile != null
-        ? [
-            for (final entry in profile.groupSwitches.entries)
-              if (!entry.value) entry.key,
-          ]
-        : const <String>[];
     final configMap = await switch (clashLibHandler != null) {
-      true => clashLibHandler!.getConfig(
-        profileId,
-        ageSecretKey: ageSecretKey,
-        disabledGroups: disabledGroups,
-      ),
-      false => clashCore.getConfig(
-        profileId,
-        ageSecretKey: ageSecretKey,
-        disabledGroups: disabledGroups,
-      ),
+      true => clashLibHandler!.getConfig(profileId, ageSecretKey: ageSecretKey),
+      false => clashCore.getConfig(profileId, ageSecretKey: ageSecretKey),
     };
     configMap['rules'] = configMap['rule'];
     configMap.remove('rule');

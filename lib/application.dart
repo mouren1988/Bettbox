@@ -17,6 +17,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'controller.dart';
 import 'pages/pages.dart';
+import 'panel/panel_auth.dart';
+import 'views/panel_login.dart';
 
 class Application extends ConsumerStatefulWidget {
   const Application({super.key});
@@ -29,6 +31,9 @@ class ApplicationState extends ConsumerState<Application>
     with WidgetsBindingObserver {
   Timer? _autoUpdateGroupTaskTimer;
   Timer? _autoUpdateProfilesTaskTimer;
+  // [Gamebox] 面板会话心跳（对齐 iGame：约 60s 一次 GET /v1/me）。
+  Timer? _panelHeartbeatTimer;
+  Timer? _panelHeartbeatFirstTimer;
 
   final _pageTransitionsTheme = const PageTransitionsTheme(
     builders: <TargetPlatform, PageTransitionsBuilder>{
@@ -114,11 +119,99 @@ class ApplicationState extends ConsumerState<Application>
       unawaited(SystemNavigator.setFrameworkHandlesBack(true));
     }
     globalState.backgroundMode.addListener(_syncAutoUpdateTasks);
+    globalState.panelUnlocked.addListener(_syncAutoUpdateTasks);
+    globalState.panelUnlocked.addListener(_syncPanelHeartbeat);
     _syncAutoUpdateTasks();
     globalState.appController = AppController(context, ref);
+    globalState.clearPanelSubscriptions = clearPanelDataOnExit;
+    globalState.openMainAfterLogin = _openMainAfterLogin;
+    // [Gamebox] 原生窗口在引擎就绪时已经按登录尺寸显示。第一帧后再聚焦一次。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_initApp());
+      if (globalState.panelUnlocked.value) return;
+      unawaited(window?.show());
+      // [Gamebox] 登录页期间预热内核连接，与后面 init 共用，缩短托盘退出冷启动等待。
+      unawaited(
+        globalState.appController.preheatCoreWhileLogin().catchError((
+          Object e,
+        ) {
+          commonPrint.log('preheat core during login: $e');
+        }),
+      );
     });
+  }
+
+  bool _mainStarted = false;
+
+  Future<void> _openMainAfterLogin() async {
+    // [Gamebox] 登录窗期间托盘是关掉的。进主界面后再允许创建。
+    tray.releaseAfterLogin();
+    final silent = globalState.config.appSetting.silentLaunch;
+    final firstStart = !_mainStarted;
+
+    if (firstStart) {
+      // [Gamebox] 托盘退出 = 冷启动，必须先跑完与上游相同的 init（含自动连接），再亮主界面。
+      // 以前先亮仪表盘再 init，TUN/内核阶段会在「网络检测/启动」上空转十几秒；
+      // 退出账号再登录不重走 init，所以不卡。这里只调整时机，不改启动逻辑本身。
+      try {
+        await _initApp();
+      } catch (e) {
+        commonPrint.log('init after login: $e');
+      }
+    }
+
+    final desktop = system.isDesktop && window != null;
+    if (desktop) {
+      // [Gamebox] 跟 RustDesk、Electron 一样：窗口先藏起来，主界面画完再显示。
+      // 不在可见窗口上改尺寸。DWM 遮罩解开时会把旧的登录页补一帧。
+      await window!.hideForTransition();
+    }
+    globalState.panelUnlocked.value = true;
+    if (desktop) {
+      await window!.showAsMainWindow();
+      if (silent) {
+        await window!.hide();
+      } else {
+        // [Gamebox] 预热帧不会真正画出来，窗口一显示就是白底。
+        // 先在屏幕外显示并画出主界面，再挪回原位。
+        final origin = await window!.parkOffscreen();
+        await window!.showForTransition();
+        await _waitPresentedFrames(2);
+        await window!.moveTo(origin);
+      }
+    }
+
+    if (!firstStart) {
+      // [Gamebox] 退出账号后再登录：内核已在，只补托盘和自动连接。
+      unawaited(
+        globalState.appController.updateTray(true, false, true).catchError((
+          Object e,
+        ) {
+          commonPrint.log('tray after login: $e');
+        }),
+      );
+      if (globalState.config.appSetting.autoRun && !globalState.isStart) {
+        unawaited(
+          globalState.appController.updateStatus(true).catchError((Object e) {
+            commonPrint.log('auto connect after login: $e');
+          }),
+        );
+      }
+    }
+  }
+
+  // [Gamebox] 窗口已在屏幕外显示，等真实帧画完。单帧超过 50ms 就继续，避免卡住。
+  Future<void> _waitPresentedFrames(int count) async {
+    for (var i = 0; i < count; i++) {
+      final done = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!done.isCompleted) done.complete();
+      });
+      WidgetsBinding.instance.scheduleFrame();
+      await Future.any([
+        done.future,
+        Future<void>.delayed(const Duration(milliseconds: 50)),
+      ]);
+    }
   }
 
   bool get _isForeground {
@@ -128,6 +221,8 @@ class ApplicationState extends ConsumerState<Application>
   }
 
   Future<void> _initApp() async {
+    _mainStarted = true;
+    globalState.mainStarted = true;
     final currentContext = globalState.navigatorKey.currentContext;
     if (currentContext != null && currentContext != context) {
       globalState.appController = AppController(currentContext, ref);
@@ -169,7 +264,29 @@ class ApplicationState extends ConsumerState<Application>
     _syncAutoUpdateTasks();
   }
 
+  void _syncPanelHeartbeat() {
+    // [Gamebox] 已登录就心跳，最小化也继续，好收到面板踢出。
+    _panelHeartbeatFirstTimer?.cancel();
+    _panelHeartbeatFirstTimer = null;
+    _panelHeartbeatTimer?.cancel();
+    _panelHeartbeatTimer = null;
+    if (!globalState.panelUnlocked.value) return;
+    _panelHeartbeatFirstTimer = Timer(const Duration(milliseconds: 2500), () {
+      unawaited(tickPanelSessionHeartbeat());
+    });
+    _panelHeartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      unawaited(tickPanelSessionHeartbeat());
+    });
+  }
+
   void _syncAutoUpdateTasks() {
+    if (!globalState.panelUnlocked.value) {
+      _autoUpdateGroupTaskTimer?.cancel();
+      _autoUpdateGroupTaskTimer = null;
+      _autoUpdateProfilesTaskTimer?.cancel();
+      _autoUpdateProfilesTaskTimer = null;
+      return;
+    }
     final shouldRun = _isForeground && !globalState.backgroundMode.value;
     if (!shouldRun) {
       _autoUpdateGroupTaskTimer?.cancel();
@@ -265,9 +382,8 @@ class ApplicationState extends ConsumerState<Application>
       _buildState(
         Consumer(
           builder: (_, ref, child) {
-            final locale = ref.watch(
-              appSettingProvider.select((state) => state.locale),
-            );
+            // [Gamebox] 语言固定简体中文，下方已写死 MaterialApp.locale，
+            // 这里不再 watch appSettingProvider.locale。
             final themeProps = ref.watch(themeSettingProvider);
             final fontFamily = themeProps.useHarmonyFont
                 ? 'HarmonyOS_Sans'
@@ -281,17 +397,37 @@ class ApplicationState extends ConsumerState<Application>
                 AppLocalizations.delegate,
                 ...GlobalMaterialLocalizations.delegates,
               ],
-              builder: (_, child) {
+              builder: (themeContext, child) {
                 return Directionality(
                   textDirection: TextDirection.ltr,
                   child: ValueListenableBuilder<bool>(
-                    valueListenable: globalState.animationEnabled,
-                    builder: (_, enabled, _) {
-                      return TickerMode(
-                        enabled: enabled,
-                        child: _buildApp(
-                          AppSidebarContainer(child: _buildPlatformApp(child!)),
-                        ),
+                    valueListenable: globalState.panelUnlocked,
+                    builder: (_, unlocked, _) {
+                      if (!unlocked) {
+                        // [Gamebox] 必须用 MaterialApp builder 的 context 取主题。
+                        // Application 的 context 在 MaterialApp 外面，只有默认浅色。
+                        // 登录窗不再套标题栏占位，避免卡片外面多出一层底色。
+                        return ColoredBox(
+                          color: Theme.of(themeContext)
+                              .colorScheme
+                              .surfaceContainerHigh,
+                          child: _buildApp(child!),
+                        );
+                      }
+                      return ValueListenableBuilder<bool>(
+                        valueListenable: globalState.animationEnabled,
+                        builder: (_, enabled, _) {
+                          return TickerMode(
+                            enabled: enabled,
+                            child: AppEnvManager(
+                              child: _buildApp(
+                                AppSidebarContainer(
+                                  child: _buildPlatformApp(child!),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -299,9 +435,23 @@ class ApplicationState extends ConsumerState<Application>
               },
               scrollBehavior: BaseScrollBehavior(),
               title: appName,
-              locale:
-                  utils.getLocaleForString(locale) ?? utils.getSystemLocale(),
-              supportedLocales: AppLocalizations.delegate.supportedLocales,
+              // [Gamebox] 界面固定简体中文。上游使用已保存语言，没有则跟随系统。
+              // [Gamebox] material_ui 1.6.0 的 GlobalMaterialLocalizations.delegate 用
+              // locale.scriptCode 找翻译，'zh'/'CN' 缺 scriptCode → 返回 null → TextField 报
+              // "No MaterialLocalizations found"。补上 scriptCode: 'Hans' 才能命中
+              // MaterialLocalizationZhHans。
+              locale: const Locale.fromSubtags(
+                languageCode: 'zh',
+                scriptCode: 'Hans',
+                countryCode: 'CN',
+              ),
+              supportedLocales: const [
+                Locale.fromSubtags(
+                  languageCode: 'zh',
+                  scriptCode: 'Hans',
+                  countryCode: 'CN',
+                ),
+              ],
               themeMode: themeProps.themeMode,
               theme: ThemeData(
                 useMaterial3: true,
@@ -546,7 +696,7 @@ class ApplicationState extends ConsumerState<Application>
               home: child!,
             );
           },
-          child: const HomePage(),
+          child: const _AppHome(),
         ),
       ),
     );
@@ -555,8 +705,12 @@ class ApplicationState extends ConsumerState<Application>
   @override
   void dispose() {
     globalState.backgroundMode.removeListener(_syncAutoUpdateTasks);
+    globalState.panelUnlocked.removeListener(_syncAutoUpdateTasks);
+    globalState.panelUnlocked.removeListener(_syncPanelHeartbeat);
     WidgetsBinding.instance.removeObserver(this);
     linkManager.destroy();
+    _panelHeartbeatFirstTimer?.cancel();
+    _panelHeartbeatTimer?.cancel();
     _autoUpdateGroupTaskTimer?.cancel();
     _autoUpdateProfilesTaskTimer?.cancel();
     ExternalControl.stop();
@@ -564,6 +718,22 @@ class ApplicationState extends ConsumerState<Application>
       unawaited(globalState.appController.handleExit());
     }
     super.dispose();
+  }
+}
+
+// [Gamebox] 冷启动的路由就是登录页。登录成功后同一条路由换成主页，不另开窗口。
+class _AppHome extends StatelessWidget {
+  const _AppHome();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: globalState.panelUnlocked,
+      builder: (_, unlocked, _) {
+        if (!unlocked) return const PanelLoginGate();
+        return const HomePage();
+      },
+    );
   }
 }
 

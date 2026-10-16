@@ -1820,10 +1820,10 @@ class AppLocalizations {
     return Intl.message('Slow', name: 'slow', desc: '', args: []);
   }
 
-  /// `Bettbox is deeply crafted on the powerful and flexible Mihomo kernel, dedicated to a superior client experience. Our vision: Connecting Open Source and AI, Accelerating Innovation`
+  /// `Gamebox is deeply crafted on the powerful and flexible Mihomo kernel, dedicated to a superior client experience. Our vision: Connecting Open Source and AI, Accelerating Innovation`
   String get desc {
     return Intl.message(
-      'Bettbox is deeply crafted on the powerful and flexible Mihomo kernel, dedicated to a superior client experience. Our vision: Connecting Open Source and AI, Accelerating Innovation',
+      'Gamebox is deeply crafted on the powerful and flexible Mihomo kernel, dedicated to a superior client experience. Our vision: Connecting Open Source and AI, Accelerating Innovation',
       name: 'desc',
       desc: '',
       args: [],
@@ -6700,10 +6700,10 @@ class AppLocalizations {
     return Intl.message('Collapse', name: 'collapse', desc: '', args: []);
   }
 
-  /// `Analyze Bettbox (Mihomo) log: {log}`
+  /// `Analyze Gamebox (Mihomo) log: {log}`
   String analyzeLogPrompt(Object log) {
     return Intl.message(
-      'Analyze Bettbox (Mihomo) log: $log',
+      'Analyze Gamebox (Mihomo) log: $log',
       name: 'analyzeLogPrompt',
       desc: '',
       args: [log],

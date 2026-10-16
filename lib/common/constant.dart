@@ -67,14 +67,15 @@ double getFloatingBottomBarFABReserveHeight(BuildContext context) {
   return 84.0 - min(viewBottom, 12.0);
 }
 
-const defaultTestUrl = 'https://www.apple.com/library/test/success.html';
+// [Gamebox] 默认测试链接改为 Cloudflare（cp.cloudflare.com）。
+const defaultTestUrl = 'https://cp.cloudflare.com/generate_204';
 
 // Preset test URLs
 const presetTestUrls = [
+  'https://cp.cloudflare.com/generate_204',
   'https://g.cn/generate_204',
   'https://www.gstatic.com/generate_204',
   'https://www.google.com/generate_204',
-  'https://cp.cloudflare.com/generate_204',
   'https://www.apple.com/library/test/success.html',
 ];
 

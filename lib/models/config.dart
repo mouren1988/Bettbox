@@ -48,13 +48,13 @@ const defaultAccessControl = AccessControl();
 final defaultThemeProps = ThemeProps(primaryColor: defaultPrimaryColor);
 
 const List<DashboardWidget> defaultDashboardWidgets = [
+  // [Gamebox] 首页顺序按确认过的排版。用户信息在网络速度右侧�?
   DashboardWidget.networkSpeed,
-  DashboardWidget.systemProxyButton,
-  DashboardWidget.tunButton,
-  DashboardWidget.outboundMode,
+  DashboardWidget.userProfile,
+  DashboardWidget.trafficUsage,
   DashboardWidget.networkDetection,
   DashboardWidget.intranetIp,
-  DashboardWidget.trafficUsage,
+  DashboardWidget.mediaUnlockSmall,
   DashboardWidget.memoryInfo,
   DashboardWidget.connectionsCount,
   DashboardWidget.startButton,
@@ -103,43 +103,32 @@ List<DashboardWidget> mobileDashboardWidgetsSafeFromJson(
 List<DashboardWidget> desktopDashboardWidgetsSafeFromJson(
   List<dynamic>? dashboardWidgets,
 ) {
+  List<DashboardWidget> widgets;
   try {
-    return dashboardWidgets
+    widgets =
+        dashboardWidgets
             ?.map((e) => $enumDecode(_$DashboardWidgetEnumMap, e))
             .toList() ??
         defaultDashboardWidgets;
   } catch (_) {
-    return defaultDashboardWidgets;
+    widgets = defaultDashboardWidgets;
   }
+  // [Gamebox] 旧配置里没有这张卡时，放在网络速度后面，和确认过的排版一致�?
+  if (!widgets.contains(DashboardWidget.userProfile)) {
+    final next = List<DashboardWidget>.from(widgets);
+    final index = next.indexOf(DashboardWidget.networkSpeed);
+    next.insert(index >= 0 ? index + 1 : 0, DashboardWidget.userProfile);
+    return next;
+  }
+  return widgets;
 }
 
-const List<SidebarFlyoutEntry> defaultSidebarFlyoutEntries = [
-  SidebarFlyoutEntry.resources,
-  SidebarFlyoutEntry.script,
-  SidebarFlyoutEntry.theme,
-  SidebarFlyoutEntry.basicConfig,
-  SidebarFlyoutEntry.otherSettings,
-  SidebarFlyoutEntry.application,
-  SidebarFlyoutEntry.about,
-];
-
-List<SidebarFlyoutEntry> sidebarFlyoutEntriesSafeFromJson(
-  List<dynamic>? sidebarFlyoutEntries,
-) {
-  try {
-    return sidebarFlyoutEntries
-            ?.map((e) => $enumDecode(_$SidebarFlyoutEntryEnumMap, e))
-            .toList() ??
-        defaultSidebarFlyoutEntries;
-  } catch (_) {
-    return defaultSidebarFlyoutEntries;
-  }
-}
-
+// [Gamebox] 首页连通性测试默认三项。上游默认是 reddit、gemini、cloudflare�?
+// 同步时默认项按需求改�?spotify、discord、youtube�?
 const List<MediaPlatform> defaultPinnedMediaPlatforms = [
-  MediaPlatform.reddit,
-  MediaPlatform.gemini,
-  MediaPlatform.cloudflare,
+  MediaPlatform.spotify,
+  MediaPlatform.discord,
+  MediaPlatform.youtube,
 ];
 
 List<MediaPlatform> pinnedMediaPlatformsSafeFromJson(
@@ -175,6 +164,29 @@ List<MediaPlatform> pinnedMediaPlatformsSafeFromJson(
   }
 }
 
+const List<SidebarFlyoutEntry> defaultSidebarFlyoutEntries = [
+  SidebarFlyoutEntry.resources,
+  SidebarFlyoutEntry.script,
+  SidebarFlyoutEntry.theme,
+  SidebarFlyoutEntry.basicConfig,
+  SidebarFlyoutEntry.otherSettings,
+  SidebarFlyoutEntry.application,
+  SidebarFlyoutEntry.about,
+];
+
+List<SidebarFlyoutEntry> sidebarFlyoutEntriesSafeFromJson(
+  List<dynamic>? sidebarFlyoutEntries,
+) {
+  try {
+    return sidebarFlyoutEntries
+            ?.map((e) => $enumDecode(_$SidebarFlyoutEntryEnumMap, e))
+            .toList() ??
+        defaultSidebarFlyoutEntries;
+  } catch (_) {
+    return defaultSidebarFlyoutEntries;
+  }
+}
+
 @freezed
 abstract class AppSettingProps with _$AppSettingProps {
   const factory AppSettingProps({
@@ -206,22 +218,27 @@ abstract class AppSettingProps with _$AppSettingProps {
     @Default(true) bool logAiSearch,
     @Default(false) bool flushDnsOnNetworkChange,
     @Default(defaultTestUrl) String testUrl,
-    @Default(true) bool showStartSwitch,
+    // [Gamebox] 联动开关（首页独立启动按钮）默认关闭。上游默认 true。
+    @Default(false) bool showStartSwitch,
     @Default(StartSwitchStyle.outlined) StartSwitchStyle startSwitchStyle,
     String? startSwitchOnLabel,
     String? startSwitchOffLabel,
     @Default(true) bool enableNavBarHapticFeedback,
     @Default(true) bool autoCheckUpdate,
     @Default(false) bool showLabel,
-    @Default(false) bool disclaimerAccepted,
+    // [Gamebox] 默认视为已同意，配合 controller 里不再弹出免责声明�?
+    // 上游默认 false。同步时若恢复弹窗，这里改回 false�?
+    @Default(true) bool disclaimerAccepted,
     @Default(true) bool minimizeOnExit,
     @Default(false) bool hidden,
     @Default(true) bool keepDockIcon,
     @Default(false) bool developerMode,
     @Default(RecoveryStrategy.compatible) RecoveryStrategy recoveryStrategy,
-    @Default(false) bool enableHighPriority,
+    // [Gamebox] 增强工具 > 高优先级默认开启。上游默�?false。同步时保留 true�?
+    @Default(true) bool enableHighPriority,
+    // [Gamebox] 主界面左侧菜单栏默认隐藏。上游默认 false。同步时保留 true。
     @Default(true) bool sidebarCollapsed,
-    @Default(false) bool sidebarFlyout,
+    @Default(true) bool sidebarFlyout,
     @Default(false) bool sidebarFlyoutOutsideTools,
     @Default(SidebarFlyoutDelay.standard) SidebarFlyoutDelay sidebarFlyoutDelay,
     @Default(defaultSidebarFlyoutEntries)
@@ -304,7 +321,9 @@ abstract class WindowProps with _$WindowProps {
 abstract class VpnProps with _$VpnProps {
   const factory VpnProps({
     @Default(true) bool enable,
-    @Default(true) bool systemProxy,
+    // [Gamebox] Android「内核配�?> 网络」里的系统代理默认关闭�?
+    // 上游默认 true。同步时保留 false�?
+    @Default(false) bool systemProxy,
     @Default(false) bool allowBypass,
     @Default(true) bool bypassPrivateRoute,
     @Default(true) bool dozeSuspend,
@@ -312,18 +331,22 @@ abstract class VpnProps with _$VpnProps {
     @Default('') String smartAutoStopNetworks,
     @Default(false) bool storeFix,
     @Default(false) bool networkFix,
-    @Default(false) bool loopbackProtection,
+    @Default(true) bool loopbackProtection,
     @Default(false) bool disableQuic,
     @Default(false) bool highPriorityNotification,
     @Default(false) bool networkSpeedNotification,
     @Default(false) bool excludeChina,
-    @Default(false) bool trayEnhancement,
+    // [Gamebox] 增强工具 > 托盘增强默认开启。上游默�?false。同步时保留 true�?
+    @Default(true) bool trayEnhancement,
     @Default(TrayClickBehavior.showPanel)
     TrayClickBehavior trayLeftClickBehavior,
     @Default(TrayClickBehavior.showMenu)
     TrayClickBehavior trayRightClickBehavior,
     @Default(false) bool enableTraySpeed,
     @Default(true) bool alwaysShowTitleBar,
+    // [Gamebox] 快速响应默认开启。仅 Android：Wi-Fi、流量、网线类型切换后�?
+    // 延迟�?150 毫秒，把当前连接全部断开，让应用在新网络上重新连接�?
+    // 上游这里已经�?true。同步时保留 true�?
     @Default(true) bool quickResponse,
     @Default(defaultAccessControl) AccessControl accessControl,
   }) = _VpnProps;
@@ -351,7 +374,8 @@ List<String> bypassDomainSafeFromJson(List<dynamic>? bypassDomain) {
 @freezed
 abstract class NetworkProps with _$NetworkProps {
   const factory NetworkProps({
-    @Default(true) bool systemProxy,
+    // [Gamebox] 桌面端「内核配�?> 网络」系统代理默认关闭。上游默�?true。同步时保留 false�?
+    @Default(false) bool systemProxy,
     @Default(defaultBypassDomain)
     @JsonKey(fromJson: bypassDomainSafeFromJson)
     List<String> bypassDomain,
@@ -380,12 +404,13 @@ abstract class ProxiesStyle with _$ProxiesStyle {
     @Default(ProxiesSortType.none) ProxiesSortType sortType,
     @Default(ProxiesLayout.standard) ProxiesLayout layout,
     @Default(ProxiesIconStyle.none) ProxiesIconStyle iconStyle,
-    @Default(ProxyCardType.expand) ProxyCardType cardType,
-    @Default(DelayAnimationType.pulse) DelayAnimationType delayAnimation,
+    @Default(ProxyCardType.shrink) ProxyCardType cardType,
+    // [Gamebox] 延迟动画默认开启双星追逐。上游默认 none（关闭）。
+    @Default(DelayAnimationType.chasingDots) DelayAnimationType delayAnimation,
     @Default(true) bool syncDelayAnimation,
     @Default({}) Map<String, String> iconMap,
     @Default(250) int concurrencyLimit,
-    @Default(false) bool autoStickyHeader,
+    @Default(true) bool autoStickyHeader,
     @Default(false) bool showHiddenItems,
     @Default(false) bool hasCustomizedStyle,
   }) = _ProxiesStyle;
@@ -410,7 +435,8 @@ abstract class ThemeProps with _$ThemeProps {
   const factory ThemeProps({
     int? primaryColor,
     @Default(defaultPrimaryColors) List<int> primaryColors,
-    @Default(ThemeMode.system) ThemeMode themeMode,
+    // [Gamebox] 主题模式默认深色。上游是 ThemeMode.system。同步时保留 dark�?
+    @Default(ThemeMode.dark) ThemeMode themeMode,
     @Default(DynamicSchemeVariant.content) DynamicSchemeVariant schemeVariant,
     @Default(false) bool pureBlack,
     @Default(TextScale()) TextScale textScale,

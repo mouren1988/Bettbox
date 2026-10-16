@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
-import 'package:bett_box/l10n/l10n.dart';
 import 'package:bett_box/models/models.dart';
 import 'package:bett_box/providers/providers.dart';
 import 'package:bett_box/state.dart';
@@ -286,8 +285,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     final settingsCategory = appLocalizations.settings;
     final configCategory = '$settingsCategory/${appLocalizations.basicConfig}';
     final themeCategory = '$settingsCategory/${appLocalizations.theme}';
-    final backupCategory =
-        '$settingsCategory/${appLocalizations.backupAndRecovery}';
+    // [Gamebox] 备份与恢复整段已隐藏，backupCategory 不再使用。
     final appCategory = '$settingsCategory/${appLocalizations.application}';
     final otherCategory = appLocalizations.other;
     final otherSettingsCategory =
@@ -312,14 +310,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     }
 
     items.addAll([
-      _SearchItem(
-        title: appLocalizations.language,
-        subtitle: appLocalizations.language,
-        category: settingsCategory,
-        leading: const Icon(Icons.language_outlined),
-        onTap: (context, _) =>
-            _pushPage(context, appLocalizations.language, const _LocaleItem()),
-      ),
+      // [Gamebox] 语言、备份与恢复已固定/隐藏，不出现在搜索项中。
       _SearchItem(
         title: appLocalizations.theme,
         subtitle: appLocalizations.themeDesc,
@@ -327,17 +318,6 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         leading: const Icon(Icons.style),
         onTap: (context, _) =>
             _pushPage(context, appLocalizations.theme, const ThemeView()),
-      ),
-      _SearchItem(
-        title: appLocalizations.backupAndRecovery,
-        subtitle: appLocalizations.backupAndRecoveryDesc,
-        category: settingsCategory,
-        leading: const Icon(Icons.cloud_sync),
-        onTap: (context, _) => _pushPage(
-          context,
-          appLocalizations.backupAndRecovery,
-          const BackupAndRecovery(),
-        ),
       ),
       if (system.isDesktop)
         _SearchItem(
@@ -490,35 +470,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       ),
     ]);
 
-    items.addAll([
-      _SearchItem(
-        title: appLocalizations.remote,
-        category: backupCategory,
-        onTap: (context, _) => _pushPage(
-          context,
-          appLocalizations.backupAndRecovery,
-          const BackupAndRecovery(),
-        ),
-      ),
-      _SearchItem(
-        title: appLocalizations.local,
-        category: backupCategory,
-        onTap: (context, _) => _pushPage(
-          context,
-          appLocalizations.backupAndRecovery,
-          const BackupAndRecovery(),
-        ),
-      ),
-      _SearchItem(
-        title: appLocalizations.recoveryStrategy,
-        category: backupCategory,
-        onTap: (context, _) => _pushPage(
-          context,
-          appLocalizations.backupAndRecovery,
-          const BackupAndRecovery(),
-        ),
-      ),
-    ]);
+    // [Gamebox] 备份与恢复整段已隐藏，搜索项中不再出现 backupCategory。
 
     items.addAll([
       _SearchItem(
@@ -1524,9 +1476,8 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         context,
         title: appLocalizations.settings,
         items: [
-          _LocaleItem(),
+          // [Gamebox] 语言和备份与恢复已隐藏：语言固定简体中文，备份与恢复整段不再出现。
           _ThemeItem(),
-          _BackupItem(),
           if (system.isDesktop) _HotkeyItem(),
           if (system.isWindows) _LoopbackItem(),
           if (system.isAndroid) _AccessItem(),
@@ -1564,71 +1515,6 @@ class _ToolViewState extends ConsumerState<ToolsView> {
   }
 }
 
-class _LocaleItem extends ConsumerWidget {
-  const _LocaleItem();
-
-  static final List<Locale> _localeOptions = _getOrderedLocales();
-  static const Map<String, String> _nativeLocaleNames = {
-    'zh_CN': '简体中文',
-    'zh_TC': '繁體中文',
-    'en': 'English',
-    'ru': 'Русский',
-    'fa': 'فارسی',
-    'ja': '日本語',
-    'ko': '한국어',
-  };
-
-  static List<Locale> _getOrderedLocales() {
-    final priority = ['zh_CN', 'zh_TC', 'en', 'ru', 'fa', 'ja', 'ko'];
-    final locales = List<Locale>.from(
-      AppLocalizations.delegate.supportedLocales,
-    );
-    locales.sort((a, b) {
-      final aKey = a.toString();
-      final bKey = b.toString();
-      final aIndex = priority.indexOf(aKey);
-      final bIndex = priority.indexOf(bKey);
-      if (aIndex != -1 && bIndex != -1) return aIndex.compareTo(bIndex);
-      if (aIndex != -1) return -1;
-      if (bIndex != -1) return 1;
-      return aKey.compareTo(bKey);
-    });
-    return locales;
-  }
-
-  String _getLocaleString(Locale locale) {
-    return _nativeLocaleNames[locale.toString()] ?? locale.toString();
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final locale = ref.watch(
-      appSettingProvider.select((state) => state.locale),
-    );
-    final currentLocale =
-        utils.getLocaleForString(locale) ?? utils.getSystemLocale();
-    return ListItem<Locale>.options(
-      leading: const Icon(Icons.language_outlined),
-      title: Text(appLocalizations.language),
-      subtitle: Text(_getLocaleString(currentLocale)),
-      delegate: OptionsDelegate(
-        title: appLocalizations.language,
-        options: _localeOptions,
-        onChanged: (Locale? locale) {
-          if (locale == null) return;
-          ref
-              .read(appSettingProvider.notifier)
-              .updateState(
-                (state) => state.copyWith(locale: locale.toString()),
-              );
-        },
-        textBuilder: (locale) => _getLocaleString(locale),
-        value: currentLocale,
-      ),
-    );
-  }
-}
-
 class _ThemeItem extends StatelessWidget {
   const _ThemeItem();
 
@@ -1641,23 +1527,6 @@ class _ThemeItem extends StatelessWidget {
       delegate: NextDelegate(
         title: appLocalizations.theme,
         builder: (_) => const ThemeView(),
-      ),
-    );
-  }
-}
-
-class _BackupItem extends StatelessWidget {
-  const _BackupItem();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListItem.next(
-      leading: const Icon(Icons.cloud_sync),
-      title: Text(appLocalizations.backupAndRecovery),
-      subtitle: Text(appLocalizations.backupAndRecoveryDesc),
-      delegate: NextDelegate(
-        title: appLocalizations.backupAndRecovery,
-        builder: (_) => const BackupAndRecovery(),
       ),
     );
   }

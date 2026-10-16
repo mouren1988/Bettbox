@@ -7,6 +7,7 @@ import 'package:bett_box/views/proxies/common.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:restart_app/restart_app.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -117,11 +118,24 @@ class Tray {
     }
   }
 
+  // [Gamebox] Suppress tray until panel login completes; don't let updateTray rebuild the icon.
+  bool _suppressUntilLogin = false;
+  Future<void> hideUntilLogin() async {
+    _suppressUntilLogin = true;
+    try {
+      await trayManager.destroy();
+    } catch (_) {}
+  }
+  void releaseAfterLogin() {
+    _suppressUntilLogin = false;
+  }
+
   Future<void> _doUpdate({
     required TrayState trayState,
     bool focus = false,
     bool silent = false,
   }) async {
+    if (_suppressUntilLogin) return;
     if (_isUpdating) return;
     _isUpdating = true;
 
@@ -160,18 +174,22 @@ class Tray {
       );
       menuItems.add(startMenuItem);
       menuItems.add(MenuItem.separator());
-      for (final mode in Mode.values) {
-        menuItems.add(
-          MenuItem.checkbox(
-            label: Intl.message(mode.name),
-            onClick: (_) {
-              globalState.appController.changeMode(mode);
-            },
-            checked: mode == trayState.mode,
-          ),
-        );
+      // [Gamebox] 托盘增强开启时，菜单中只显示代理组，不再显示「规则/全局/直连」
+      // 模式切换，避免重复。整体模式仍可在应用内切换。
+      if (!trayState.trayEnhancement) {
+        for (final mode in Mode.values) {
+          menuItems.add(
+            MenuItem.checkbox(
+              label: Intl.message(mode.name),
+              onClick: (_) {
+                globalState.appController.changeMode(mode);
+              },
+              checked: mode == trayState.mode,
+            ),
+          );
+        }
+        menuItems.add(MenuItem.separator());
       }
-      menuItems.add(MenuItem.separator());
       if (trayState.trayEnhancement) {
         for (final group in trayState.groups) {
           List<MenuItem> subMenuItems = [];
@@ -263,7 +281,7 @@ class Tray {
       final restartMenuItem = MenuItem(
         label: appLocalizations.restartApp,
         onClick: (_) async {
-          await system.restartApp();
+          await Restart.restartApp();
         },
       );
       menuItems.add(restartMenuItem);

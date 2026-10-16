@@ -217,7 +217,7 @@ class AppController {
     if (isDesktop && patchConfig.tun.enable) {
       await _quickSetupConfig(enableTun: false);
 
-      if (system.isMacOS || system.isLinux) {
+      if (system.isMacOS) {
         try {
           final res = await _requestAdmin(true);
           if (res.needRestart) {
@@ -230,7 +230,7 @@ class AppController {
               try {
                 await _updateClashConfig();
               } catch (e) {
-                commonPrint.warn('FastStart desktop TUN update failed: $e');
+                commonPrint.warn('FastStart macOS TUN update failed: $e');
               }
               _backgroundLoad();
             });
@@ -238,7 +238,7 @@ class AppController {
             _backgroundLoad();
           }
         } catch (e) {
-          commonPrint.warn('FastStart desktop auth error: $e');
+          commonPrint.warn('FastStart macOS auth error: $e');
           await globalState.handleStart([updateRunTime, updateTraffic]);
           _backgroundLoad();
         }
@@ -462,7 +462,7 @@ class AppController {
       final profile = profiles
           .where((e) => e.id == currentProfileId)
           .firstOrNull;
-      final profileName = profile?.label ?? 'Bettbox';
+      final profileName = profile?.label ?? 'Gamebox';
       final speedInfo = traffic.toString();
       await vpn_service.service?.updateNotificationSpeed(
         profileName,
@@ -490,6 +490,13 @@ class AppController {
         currentProfileId.value = null;
         updateStatus(false);
       }
+    }
+  }
+
+  Future<void> deleteAllProfiles({bool throughCore = true}) async {
+    final profileIds = _ref.read(profilesProvider).map((p) => p.id).toList();
+    for (final id in profileIds) {
+      await deleteProfile(id);
     }
   }
 
@@ -677,8 +684,7 @@ class AppController {
 
   Future<Result<bool>> _requestAdmin(bool enableTun) async {
     final realTunEnable = _ref.read(realTunEnableProvider);
-    final hasAdmin = await system.checkIsAdmin();
-    if (enableTun && (!realTunEnable || !hasAdmin)) {
+    if (enableTun != realTunEnable && realTunEnable == false) {
       final code = await system.authorizeCore();
       switch (code) {
         case AuthorizeCode.success:
@@ -687,7 +693,9 @@ class AppController {
         case AuthorizeCode.none:
           break;
         case AuthorizeCode.error:
-          globalState.showNotifier(appLocalizations.tunEnableRequireAdmin);
+          globalState.showNotifier(
+            'TUN mode requires administrator privileges.',
+          );
           enableTun = false;
           break;
       }
@@ -1208,7 +1216,7 @@ class AppController {
           finalSuffix = 'windows-amd64-compatible-portable.zip';
         }
         downloadUrl =
-            'https://github.com/$repository/releases/download/$tagName/Bettbox-$versionWithoutV-$finalSuffix';
+            'https://github.com/$repository/releases/download/$tagName/Gamebox-$versionWithoutV-$finalSuffix';
       }
 
       globalState.openUrl(downloadUrl);
@@ -1243,6 +1251,9 @@ class AppController {
   }
 
   Future<void>? _initCoreFuture;
+
+  /// [Gamebox] 仅预热内核连接/init，不触发自动连接。供登录窗后台调用。
+  Future<void> preheatCoreWhileLogin() => _initCore();
 
   Future<void> _initCore() {
     return _initCoreFuture ??= () async {
@@ -1877,14 +1888,14 @@ class AppController {
       final tempDir = Directory.systemTemp;
       final tempZipPath = join(
         tempDir.path,
-        'bettbox_backup_${DateTime.now().millisecondsSinceEpoch}.zip',
+        'gamebox_backup_${DateTime.now().millisecondsSinceEpoch}.zip',
       );
       final encoder = ZipFileEncoder();
       encoder.create(tempZipPath);
 
-      // Add marker file
+      // [Gamebox] 备份标记使用 gamebox_marker，仍兼容读取历史 .bettbox_marker。
       final markerData = json.encode({
-        'app': 'Bettbox',
+        'app': 'Gamebox',
         'version': '1.0',
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
@@ -1892,11 +1903,11 @@ class AppController {
       final tempMarkerFile = File(
         join(
           tempDir.path,
-          'bettbox_marker_${DateTime.now().millisecondsSinceEpoch}.tmp',
+          'gamebox_marker_${DateTime.now().millisecondsSinceEpoch}.tmp',
         ),
       );
       await tempMarkerFile.writeAsBytes(markerBytes);
-      await encoder.addFile(tempMarkerFile, '.bettbox_marker');
+      await encoder.addFile(tempMarkerFile, '.gamebox_marker');
       await tempMarkerFile.delete();
 
       // Add config file
@@ -1904,7 +1915,7 @@ class AppController {
       final tempConfigFile = File(
         join(
           tempDir.path,
-          'bettbox_config_${DateTime.now().millisecondsSinceEpoch}.tmp',
+          'gamebox_config_${DateTime.now().millisecondsSinceEpoch}.tmp',
         ),
       );
       await tempConfigFile.writeAsString(configStr);
@@ -2061,22 +2072,23 @@ class AppController {
 
     final homeDirPath = await appPath.homeDirPath;
 
-    // Check for Bettbox marker
-    final hasBettboxMarker = archive.files.any(
-      (file) => file.name == '.bettbox_marker',
+    // [Gamebox] 标记同时识别 .gamebox_marker（新）和 .bettbox_marker（历史）。
+    final hasGameboxMarker = archive.files.any(
+      (file) =>
+          file.name == '.gamebox_marker' || file.name == '.bettbox_marker',
     );
 
-    if (hasBettboxMarker) {
-      // Bettbox backup
-      await _recoveryBettboxBackup(archive, recoveryOption, homeDirPath);
+    if (hasGameboxMarker) {
+      // Gamebox / Bettbox backup
+      await _recoveryGameboxBackup(archive, recoveryOption, homeDirPath);
     } else {
       // Legacy backup
       await _recoveryLegacyBackup(archive, recoveryOption, homeDirPath);
     }
   }
 
-  /// Restore Bettbox
-  Future<void> _recoveryBettboxBackup(
+  /// Restore Gamebox / Bettbox backup
+  Future<void> _recoveryGameboxBackup(
     Archive archive,
     RecoveryOption recoveryOption,
     String homeDirPath,
@@ -2085,11 +2097,16 @@ class AppController {
     final configs = archive.files
         .where(
           (item) =>
-              item.name.endsWith('.json') && item.name != '.bettbox_marker',
+              item.name.endsWith('.json') &&
+              item.name != '.bettbox_marker' &&
+              item.name != '.gamebox_marker',
         )
         .toList();
     final profiles = archive.files.where(
-      (item) => !item.name.endsWith('.json') && item.name != '.bettbox_marker',
+      (item) =>
+          !item.name.endsWith('.json') &&
+          item.name != '.bettbox_marker' &&
+          item.name != '.gamebox_marker',
     );
 
     // Find config.json

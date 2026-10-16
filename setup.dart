@@ -97,7 +97,8 @@ class Build {
     BuildItem(target: Target.android, arch: Arch.amd64, archName: 'x86_64'),
   ];
 
-  static String get appName => 'Bettbox';
+  // [Gamebox] 编译进 libclash 的文件名仍是 BettboxCore。安装和启动时再复制成 GameboxCore。
+  static String get appName => 'Gamebox';
 
   static String get coreName => '${identityName}Core';
 
@@ -157,11 +158,12 @@ class Build {
       workingDirectory: workingDirectory,
       runInShell: runInShell,
     );
+    // Windows 控制台常混入本机代码页字节，严格 UTF-8 会直接崩掉打包日志。
     process.stdout.listen((data) {
-      print(utf8.decode(data));
+      print(utf8.decode(data, allowMalformed: true));
     });
     process.stderr.listen((data) {
-      print(utf8.decode(data));
+      print(utf8.decode(data, allowMalformed: true));
     });
     final exitCode = await process.exitCode;
     if (exitCode != 0 && name != null) throw '$name error';
@@ -210,10 +212,10 @@ class Build {
       if (item.arch != null) {
         env['GOARCH'] = item.arch!.name;
       }
-      if (item.arch == Arch.amd64 && item.target == Target.macos) {
-        env['GOAMD64'] = 'v1';
-      } else if (item.arch == Arch.amd64 &&
-          (item.target == Target.windows || item.target == Target.linux)) {
+      if (item.arch == Arch.amd64 &&
+          (item.target == Target.windows ||
+              item.target == Target.linux ||
+              item.target == Target.macos)) {
         env['GOAMD64'] = compatible ? 'v1' : 'v3';
       }
       if (isLib) {
@@ -584,6 +586,7 @@ class BuildCommand extends Command {
     String args = '',
     required String env,
     required String suffix,
+    bool compatible = false,
   }) async {
     final sentryDsn = Platform.environment['SENTRY_DSN'] ?? '';
     final sentryArg = sentryDsn.isNotEmpty
@@ -600,12 +603,18 @@ class BuildCommand extends Command {
 
     final appDevArg = Build.isDev ? ' --build-dart-define=APP_DEV=true' : '';
 
+    final environment = Map<String, String>.from(Platform.environment);
+    if (compatible) {
+      environment['BETTBOX_COMPATIBLE_BUILD'] = '1';
+    }
+
     await Build.getDistributor();
     await Build.exec(
       name: name,
       Build.getExecutable(
         'flutter_distributor package --skip-clean --platform ${target.name} --targets $targets --flutter-build-args=verbose$args$sentryArg$suffixArg$ipinfoArg --build-dart-define=APP_ENV=$env$appDevArg',
       ),
+      environment: environment,
     );
   }
 
@@ -827,13 +836,14 @@ class BuildCommand extends Command {
         final token = target != Target.android
             ? await Build.calcSha256(corePaths.first)
             : null;
-        Build.buildHelper(target, token!);
-        _buildDistributor(
+        await Build.buildHelper(target, token!);
+        await _buildDistributor(
           target: target,
           targets: 'exe',
           args: ' --description $desc --build-dart-define=CORE_SHA256=$token',
           env: env,
           suffix: appAssetSuffix,
+          compatible: compatible,
         );
         return;
       case Target.linux:
@@ -855,6 +865,7 @@ class BuildCommand extends Command {
             args: ' --description $desc --build-target-platform $defaultTarget',
             env: env,
             suffix: currentSuffix,
+            compatible: compatible,
           );
         }
         return;
@@ -880,6 +891,7 @@ class BuildCommand extends Command {
           args: buildArgs,
           env: env,
           suffix: appAssetSuffix,
+          compatible: compatible,
         );
         return;
       case Target.macos:
@@ -893,27 +905,14 @@ class BuildCommand extends Command {
           Build.getExecutable('pod install --repo-update'),
           workingDirectory: 'macos',
         );
-        final infoPlist = File('macos/Runner/Info.plist');
-        final infoPlistContent = await infoPlist.readAsString();
-        if (arch == Arch.amd64) {
-          await infoPlist.writeAsString(
-            infoPlistContent.replaceFirst(
-              '</dict>\n</plist>',
-              '\t<key>FLTEnableImpeller</key>\n\t<false/>\n</dict>\n</plist>',
-            ),
-          );
-        }
-        try {
-          await _buildDistributor(
-            target: target,
-            targets: 'dmg',
-            args: ' --description $desc',
-            env: env,
-            suffix: appAssetSuffix,
-          );
-        } finally {
-          await infoPlist.writeAsString(infoPlistContent);
-        }
+        _buildDistributor(
+          target: target,
+          targets: 'dmg',
+          args: ' --description $desc',
+          env: env,
+          suffix: appAssetSuffix,
+          compatible: compatible,
+        );
         return;
     }
   }

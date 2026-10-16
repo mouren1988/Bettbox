@@ -33,7 +33,6 @@ class _OverrideProfileViewState extends State<OverrideProfileView> {
       context.afterRouteTransition(() async {
         final rawConfig = await globalState.getProfileConfig(
           widget.profileId,
-          effective: true,
         );
         if (!mounted) return;
         final snippet = ClashConfigSnippet.fromJson(rawConfig);

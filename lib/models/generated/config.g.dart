@@ -44,7 +44,7 @@ _AppSettingProps _$AppSettingPropsFromJson(
   logAiSearch: json['logAiSearch'] as bool? ?? true,
   flushDnsOnNetworkChange: json['flushDnsOnNetworkChange'] as bool? ?? false,
   testUrl: json['testUrl'] as String? ?? defaultTestUrl,
-  showStartSwitch: json['showStartSwitch'] as bool? ?? true,
+  showStartSwitch: json['showStartSwitch'] as bool? ?? false,
   startSwitchStyle:
       $enumDecodeNullable(
         _$StartSwitchStyleEnumMap,
@@ -57,7 +57,7 @@ _AppSettingProps _$AppSettingPropsFromJson(
       json['enableNavBarHapticFeedback'] as bool? ?? true,
   autoCheckUpdate: json['autoCheckUpdate'] as bool? ?? true,
   showLabel: json['showLabel'] as bool? ?? false,
-  disclaimerAccepted: json['disclaimerAccepted'] as bool? ?? false,
+  disclaimerAccepted: json['disclaimerAccepted'] as bool? ?? true,
   minimizeOnExit: json['minimizeOnExit'] as bool? ?? true,
   hidden: json['hidden'] as bool? ?? false,
   keepDockIcon: json['keepDockIcon'] as bool? ?? true,
@@ -68,9 +68,9 @@ _AppSettingProps _$AppSettingPropsFromJson(
         json['recoveryStrategy'],
       ) ??
       RecoveryStrategy.compatible,
-  enableHighPriority: json['enableHighPriority'] as bool? ?? false,
+  enableHighPriority: json['enableHighPriority'] as bool? ?? true,
   sidebarCollapsed: json['sidebarCollapsed'] as bool? ?? true,
-  sidebarFlyout: json['sidebarFlyout'] as bool? ?? false,
+  sidebarFlyout: json['sidebarFlyout'] as bool? ?? true,
   sidebarFlyoutOutsideTools:
       json['sidebarFlyoutOutsideTools'] as bool? ?? false,
   sidebarFlyoutDelay:
@@ -162,6 +162,7 @@ const _$DashboardWidgetEnumMap = {
   DashboardWidget.networkSpeedSmall: 'networkSpeedSmall',
   DashboardWidget.outboundModeV2: 'outboundModeV2',
   DashboardWidget.outboundMode: 'outboundMode',
+  DashboardWidget.userProfile: 'userProfile',
   DashboardWidget.trafficUsage: 'trafficUsage',
   DashboardWidget.networkDetection: 'networkDetection',
   DashboardWidget.tunButton: 'tunButton',
@@ -331,7 +332,7 @@ Map<String, dynamic> _$WindowPropsToJson(_WindowProps instance) =>
 
 _VpnProps _$VpnPropsFromJson(Map<String, dynamic> json) => _VpnProps(
   enable: json['enable'] as bool? ?? true,
-  systemProxy: json['systemProxy'] as bool? ?? true,
+  systemProxy: json['systemProxy'] as bool? ?? false,
   allowBypass: json['allowBypass'] as bool? ?? false,
   bypassPrivateRoute: json['bypassPrivateRoute'] as bool? ?? true,
   dozeSuspend: json['dozeSuspend'] as bool? ?? true,
@@ -339,12 +340,12 @@ _VpnProps _$VpnPropsFromJson(Map<String, dynamic> json) => _VpnProps(
   smartAutoStopNetworks: json['smartAutoStopNetworks'] as String? ?? '',
   storeFix: json['storeFix'] as bool? ?? false,
   networkFix: json['networkFix'] as bool? ?? false,
-  loopbackProtection: json['loopbackProtection'] as bool? ?? false,
+  loopbackProtection: json['loopbackProtection'] as bool? ?? true,
   disableQuic: json['disableQuic'] as bool? ?? false,
   highPriorityNotification: json['highPriorityNotification'] as bool? ?? false,
   networkSpeedNotification: json['networkSpeedNotification'] as bool? ?? false,
   excludeChina: json['excludeChina'] as bool? ?? false,
-  trayEnhancement: json['trayEnhancement'] as bool? ?? false,
+  trayEnhancement: json['trayEnhancement'] as bool? ?? true,
   trayLeftClickBehavior:
       $enumDecodeNullable(
         _$TrayClickBehaviorEnumMap,
@@ -398,7 +399,7 @@ const _$TrayClickBehaviorEnumMap = {
 
 _NetworkProps _$NetworkPropsFromJson(Map<String, dynamic> json) =>
     _NetworkProps(
-      systemProxy: json['systemProxy'] as bool? ?? true,
+      systemProxy: json['systemProxy'] as bool? ?? false,
       bypassDomain: json['bypassDomain'] == null
           ? defaultBypassDomain
           : bypassDomainSafeFromJson(json['bypassDomain'] as List?),
@@ -436,13 +437,13 @@ _ProxiesStyle _$ProxiesStyleFromJson(Map<String, dynamic> json) =>
           ProxiesIconStyle.none,
       cardType:
           $enumDecodeNullable(_$ProxyCardTypeEnumMap, json['cardType']) ??
-          ProxyCardType.expand,
+          ProxyCardType.shrink,
       delayAnimation:
           $enumDecodeNullable(
             _$DelayAnimationTypeEnumMap,
             json['delayAnimation'],
           ) ??
-          DelayAnimationType.pulse,
+          DelayAnimationType.chasingDots,
       syncDelayAnimation: json['syncDelayAnimation'] as bool? ?? true,
       iconMap:
           (json['iconMap'] as Map<String, dynamic>?)?.map(
@@ -450,7 +451,7 @@ _ProxiesStyle _$ProxiesStyleFromJson(Map<String, dynamic> json) =>
           ) ??
           const {},
       concurrencyLimit: (json['concurrencyLimit'] as num?)?.toInt() ?? 250,
-      autoStickyHeader: json['autoStickyHeader'] as bool? ?? false,
+      autoStickyHeader: json['autoStickyHeader'] as bool? ?? true,
       showHiddenItems: json['showHiddenItems'] as bool? ?? false,
       hasCustomizedStyle: json['hasCustomizedStyle'] as bool? ?? false,
     );
@@ -548,7 +549,7 @@ _ThemeProps _$ThemePropsFromJson(Map<String, dynamic> json) => _ThemeProps(
       defaultPrimaryColors,
   themeMode:
       $enumDecodeNullable(_$ThemeModeEnumMap, json['themeMode']) ??
-      ThemeMode.system,
+      ThemeMode.dark,
   schemeVariant:
       $enumDecodeNullable(
         _$DynamicSchemeVariantEnumMap,

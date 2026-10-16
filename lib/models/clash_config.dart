@@ -283,7 +283,8 @@ abstract class SnifferConfig with _$SnifferConfig {
 @freezed
 abstract class Tun with _$Tun {
   const factory Tun({
-    @Default(false) bool enable,
+    // [Gamebox] 桌面端默认开启虚拟网卡。上游默认 false。
+    @Default(true) bool enable,
     @Default(tunDeviceName) String device,
     @JsonKey(name: 'auto-route') @Default(false) bool autoRoute,
     @Default(TunStack.mips) TunStack stack,
@@ -296,8 +297,9 @@ abstract class Tun with _$Tun {
     @Default([])
     List<String> routeExcludeAddress,
     @JsonKey(name: 'strict-route') @Default(false) bool strictRoute,
+    // [Gamebox] ICMP 转发默认开启（不禁止）。上游默认 true。
     @JsonKey(name: 'disable-icmp-forwarding')
-    @Default(true)
+    @Default(false)
     bool disableIcmpForwarding,
     @Default(9000) int mtu,
     @JsonKey(name: 'endpoint-independent-nat')
@@ -729,7 +731,8 @@ abstract class ClashConfig with _$ClashConfig {
     List<String> skipAuthPrefixes,
     @Default(LogLevel.error) @JsonKey(name: 'log-level') LogLevel logLevel,
     @Default(false) bool ipv6,
-    @Default(FindProcessMode.off)
+    // [Gamebox] 查找进程默认开启。上游默认 off（unknownEnumValue 仍兜底 always）。
+    @Default(FindProcessMode.always)
     @JsonKey(
       name: 'find-process-mode',
       unknownEnumValue: FindProcessMode.always,
@@ -759,10 +762,11 @@ abstract class ClashConfig with _$ClashConfig {
     @Default([]) @JsonKey(name: 'proxy-groups') List<ProxyGroup> proxyGroups,
     @Default([]) List<String> rule,
     @JsonKey(name: 'global-ua') String? globalUa,
-    @Default(ExternalControllerStatus.close)
+    // [Gamebox] 外部控制默认开启，密码为空。
+    @Default(ExternalControllerStatus.open)
     @JsonKey(name: 'external-controller')
     ExternalControllerStatus externalController,
-    String? secret,
+    @Default('') String? secret,
     @JsonKey(name: 'external-ui-name') String? externalUiName,
     @JsonKey(name: 'external-ui-url') String? externalUiUrl,
     @Default({}) HostsMap hosts,

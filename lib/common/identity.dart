@@ -3,9 +3,9 @@ const _useDevIdentity = bool.fromEnvironment('APP_DEV');
 class AppIdentity {
   static const isDev = _useDevIdentity;
 
-  static const productName = 'Bettbox';
+  static const productName = 'Gamebox';
   static const devSuffix = 'Dev';
-  static const packageId = 'com.appshub.bettbox';
+  static const packageId = 'com.appshub.gamebox';
 
   static const compactName = isDev ? '$productName$devSuffix' : productName;
   static const displayName = isDev ? '$productName Dev' : productName;

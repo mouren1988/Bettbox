@@ -16,6 +16,11 @@ class Contributor {
   const Contributor({required this.avatar, required this.name});
 }
 
+// [Gamebox] About 页固定链接（与 iGame 保持一致：TG 群/QQ 群 + Gamebox 仓库）。
+const _groupUrl = 'https://t.me/+UOt2DJZ7Qyo2YzA9';
+const _qqGroupUrl = 'https://qm.qq.com/q/xjr21slB74';
+const _repoAvatar = 'assets/images/avatars/mouren1988.jpg';
+
 class AboutView extends StatelessWidget {
   const AboutView({super.key});
 
@@ -34,121 +39,94 @@ class AboutView extends StatelessWidget {
   }
 
   List<Widget> _buildMoreSection(BuildContext context) {
-    final links = [
-      _LinkTile(
-        title: 'Github Releases',
-        icon: Icons.star,
-        onTap: () =>
-            globalState.openUrl('https://github.com/appshubcc/Bettbox'),
-      ),
-      _LinkTile(
-        title: appLocalizations.checkUpdate,
-        icon: Icons.refresh,
-        external: false,
-        onTap: () => _checkUpdate(context),
-      ),
-      _LinkTile(
-        title: 'Telegram Group',
-        icon: Icons.forum_outlined,
-        onTap: () => globalState.openUrl('https://telegram.me/appshub_chat'),
-      ),
-      _LinkTile(
-        title: 'Channel',
-        icon: Icons.campaign_outlined,
-        onTap: () => globalState.openUrl('https://telegram.me/appshub_channel'),
-      ),
-      _LinkTile(
-        prefix: 'Forked from',
-        title: 'FlClash',
-        icon: Icons.code,
-        onTap: () =>
-            globalState.openUrl('https://github.com/chen08209/FlClash'),
-      ),
-      _LinkTile(
-        prefix: 'Powered by',
-        title: 'Mihomo',
-        icon: Icons.memory,
-        onTap: () => globalState.openUrl('https://github.com/MetaCubeX/mihomo'),
-      ),
-    ];
+    // [Gamebox] 关于页链接。上游是 Github Releases、Telegram Group、Channel、FlClash、Mihomo。
     return generateSection(
       title: appLocalizations.more,
       items: [
-        for (var i = 0; i < links.length; i += 2)
-          _LinkGridRow(left: links[i], right: links[i + 1]),
+        _LinkGridRow(
+          left: _LinkTile(
+            title: '使用说明',
+            // [Gamebox] 沿用上游 Github Releases 的星星图标，只改打开的是使用说明。
+            icon: Icons.star,
+            onTap: () => globalState.openUserManual(),
+          ),
+          right: _LinkTile(
+            title: appLocalizations.checkUpdate,
+            icon: Icons.refresh,
+            onTap: () => _checkUpdate(context),
+          ),
+        ),
+        _LinkGridRow(
+          left: _LinkTile(
+            // [Gamebox] 上游文案是 Telegram Group。
+            title: 'Telegram群组',
+            icon: Icons.launch,
+            onTap: () => globalState.openUrl(_groupUrl),
+          ),
+          right: _LinkTile(
+            title: 'QQ交流群',
+            icon: Icons.launch,
+            onTap: () => globalState.openUrl(_qqGroupUrl),
+          ),
+        ),
+        _LinkGridRow(
+          left: _LinkTile(
+            title: 'Github Releases',
+            icon: Icons.star,
+            external: true,
+            onTap: () => globalState.openUrl(
+              'https://github.com/appshubcc/Bettbox',
+            ),
+          ),
+          right: _LinkTile(
+            title: 'Channel',
+            icon: Icons.campaign_outlined,
+            external: true,
+            onTap: () => globalState.openUrl(
+              'https://telegram.me/appshub_channel',
+            ),
+          ),
+        ),
+        _LinkGridRow(
+          left: _LinkTile(
+            prefix: 'Forked from',
+            title: 'FlClash',
+            icon: Icons.code,
+            onTap: () => globalState.openUrl(
+              'https://github.com/chen08209/FlClash',
+            ),
+          ),
+          right: _LinkTile(
+            prefix: 'Powered by',
+            title: 'Mihomo',
+            icon: Icons.memory,
+            onTap: () => globalState.openUrl(
+              'https://github.com/MetaCubeX/mihomo',
+            ),
+          ),
+        ),
       ],
     );
   }
 
   List<Widget> _buildContributorsSection() {
-    final contributors = [
-      const Contributor(
-        avatar: 'assets/images/avatars/june2.jpg',
-        name: 'June2',
-      ),
-      const Contributor(avatar: 'assets/images/avatars/arue.jpg', name: 'Arue'),
-      const Contributor(
-        avatar: 'assets/images/avatars/dabaozi.jpg',
-        name: '大包子',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/xiaolou.png',
-        name: '小楼',
-      ),
-      const Contributor(avatar: 'assets/images/avatars/www.jpg', name: 'Www'),
-      const Contributor(
-        avatar: 'assets/images/avatars/AIsouler.jpg',
-        name: 'AIsouler',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/songchenwen.jpg',
-        name: 'songchenwen',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/EriDeLee.jpg',
-        name: 'EriDeLee',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/AdySnowflake.png',
-        name: 'AdySnowflake',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/CyberVacation.jpg',
-        name: 'CyberVacation',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/VillagerTom.png',
-        name: 'VillagerTom',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/ZeonX.jpg',
-        name: 'ZeonX',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/feitianmoo.png',
-        name: 'feitianmoo',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/kouhe3.jpg',
-        name: 'kouhe3',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/soffchen.png',
-        name: 'soffchen',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/utafrali.jpg',
-        name: 'utafrali',
-      ),
-      const Contributor(
-        avatar: 'assets/images/avatars/wfion.png',
-        name: 'wfion',
-      ),
-    ]..shuffle();
+    // [Gamebox] 只保留仓库头像。上游是一批贡献者头像并随机排序。
     return generateSection(
       separated: false,
       title: appLocalizations.otherContributors,
-      items: [ListItem(title: _ContributorsRow(contributors: contributors))],
+      items: [
+        ListItem(
+          title: const Align(
+            alignment: Alignment.centerLeft,
+            child: Avatar(
+              contributor: Contributor(
+                avatar: _repoAvatar,
+                name: 'mouren1988',
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
