@@ -656,17 +656,10 @@ class GlobalState {
       preferences.saveConfig(config);
     }
 
+        // [Gamebox] we deliberately do not write config.appSetting.copyWith(locale: ...). The outer MaterialApp.locale in application.dart is hardcoded to zh-Hans-CN, so the UI is always Chinese regardless of OS language.
+    // Upstream: when locale is null, this block used to call copyWith(locale: systemLocale). We removed that to keep Chinese fixed.
     if (config.appSetting.locale == null) {
-       // [Gamebox] 强制写死 zh-Hans-CN。上游这里会用 systemLocale，OS 是英文时
-      // 会让首启英文界面。我们不跟系统，固定中文。
-      // 配套：application.dart 的 MaterialApp.locale 也写死 zh-Hans-CN，
-      // 即使这一行被绕开，启动后 UI 也仍是中文。
-          ),
-          ).toString(),
-        ),
-      );
-      preferences.saveConfig(config);
-      this.config = config;
+      // no-op: outer MaterialApp.locale handles it.
     }
 
     final prefs = await preferences.sharedPreferencesCompleter.future;

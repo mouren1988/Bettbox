@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -1163,8 +1163,10 @@ class AppController {
     final now = DateTime.now().millisecondsSinceEpoch;
     final isAutoCheck = _ref.read(appSettingProvider).autoCheckUpdate;
 
+    // [Gamebox] 自动检查周期：启动时 + 距上次检查 > 3 天强制检查。
+    // 上游默认 28 天，用户觉得太长了，3 天更合适。
     final forceCheck =
-        (now - lastCheckTime) > const Duration(days: 28).inMilliseconds;
+        (now - lastCheckTime) > const Duration(days: 3).inMilliseconds;
 
     if (!isAutoCheck && !forceCheck) return;
 

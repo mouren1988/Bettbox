@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 
 import 'package:bett_box/common/common.dart';
@@ -28,7 +28,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' show dirname, join;
 
-import 'backup_and_recovery.dart';
+// [Gamebox] 备份与恢复入口已隐藏（侧边栏 + 悬浮面板），所以 backup_and_recovery 不再被引用。
+// import 'backup_and_recovery.dart';
 import 'developer.dart';
 import 'theme.dart';
 
@@ -121,12 +122,13 @@ List<ToolsShortcut> getToolsShortcuts(
             subtitle: appLocalizations.themeDesc,
             builder: (_) => const ThemeView(),
           ),
-          SidebarFlyoutEntry.backupAndRecovery => ToolsShortcut(
-            icon: const Icon(Icons.cloud_sync),
-            title: appLocalizations.backupAndRecovery,
-            subtitle: appLocalizations.backupAndRecoveryDesc,
-            builder: (_) => const BackupAndRecovery(),
-          ),
+          // [Gamebox] 隐藏备份与恢复（侧边栏 + 悬浮面板），上游默认开启。
+          // SidebarFlyoutEntry.backupAndRecovery => ToolsShortcut(
+          //   icon: const Icon(Icons.cloud_sync),
+          //   title: appLocalizations.backupAndRecovery,
+          //   subtitle: appLocalizations.backupAndRecoveryDesc,
+          //   builder: (_) => const BackupAndRecovery(),
+          // ),
           SidebarFlyoutEntry.hotkeyManagement => ToolsShortcut(
             icon: const Icon(Icons.keyboard),
             title: appLocalizations.hotkeyManagement,
@@ -168,6 +170,9 @@ List<ToolsShortcut> getToolsShortcuts(
             title: appLocalizations.about,
             builder: (_) => const AboutView(),
           ),
+          // [Gamebox] 备份与恢复已隐藏（侧边栏 + 悬浮面板），
+          // 加一个占位 case 让 switch exhaustive。
+          SidebarFlyoutEntry.backupAndRecovery => throw StateError('hidden'),
         },
   ];
 }
