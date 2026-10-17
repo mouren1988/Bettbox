@@ -310,8 +310,12 @@ enum DashboardWidget {
   networkSpeedSmall(
     GridItem(crossAxisCellCount: 4, child: NetworkSpeedSmall()),
   ),
-  outboundModeV2(GridItem(crossAxisCellCount: 8, child: OutboundModeV2())),
-  outboundMode(GridItem(crossAxisCellCount: 4, child: OutboundMode())),
+  // [Gamebox] outboundMode / outboundModeV2 PERMANENTLY REMOVED.
+  // Rationale: user does not want clients to use global proxy.
+  // Old enum values exist in stored config files; safeFromJson falls back
+  // to defaultDashboardWidgets via catch.
+  // The mihomo core (GameboxCore) still honours `mode: global` in clash
+  // config; only the UI entry point is removed.
   // [Gamebox] 与出站模式同宽同高。
   userProfile(GridItem(crossAxisCellCount: 4, child: UserProfileCard())),
   trafficUsage(GridItem(crossAxisCellCount: 4, child: TrafficUsage())),

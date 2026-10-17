@@ -5,6 +5,7 @@ import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
 import 'package:bett_box/clash/clash.dart';
+import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
 import 'package:bett_box/helper/helper.dart';
 
@@ -1163,10 +1164,13 @@ class AppController {
     final now = DateTime.now().millisecondsSinceEpoch;
     final isAutoCheck = _ref.read(appSettingProvider).autoCheckUpdate;
 
-    // [Gamebox] 自动检查周期：启动时 + 距上次检查 > 3 天强制检查。
-    // 上游默认 28 天，用户觉得太长了，3 天更合适。
-    final forceCheck =
-        (now - lastCheckTime) > const Duration(days: 3).inMilliseconds;
+// [Gamebox] Auto-check interval.
+// Upstream default is 28 days; Gamebox changed to 1 day so the user
+// gets prompted to update frequently. The matching constant is
+// defaultUpdateDuration in lib/common/constant.dart.
+// Sync upstream: keep 1 day here (do NOT sync upstream's 28 days).
+final forceCheck =
+    (now - lastCheckTime) > defaultUpdateDuration.inMilliseconds;
 
     if (!isAutoCheck && !forceCheck) return;
 

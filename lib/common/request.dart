@@ -261,8 +261,14 @@ class Request {
       // 同步上游时务必确认这里指向你自己的 fork / Gamebox 专用仓库，
       // 否则会去查 appshubcc/Bettbox 的 release，永远显示有新版本。
       final t = DateTime.now().millisecondsSinceEpoch;
+      // [Gamebox] 检查更新 URL 走 gh-proxy 镜像，避免国内直连
+      // raw.githubusercontent.com / github.com 被墙。
+      // URL 模板: https://v4.gh-proxy.org/<原始 URL>
+      // 上游默认 raw.githubusercontent.com/$repository/.../version.json。
+      // Gamebox 仍然走 GitHub releases HTML 页面（不动函数逻辑），
+      // 仅用 gh-proxy 包一层让国内可访问。
       final response = await _dio.get(
-        'https://github.com/$repository/releases/latest?t=$t',
+        'https://v4.gh-proxy.org/https://github.com/$repository/releases/latest?t=$t',
         options: Options(
           followRedirects: false,
           validateStatus: (status) =>
@@ -283,7 +289,7 @@ class Request {
           if (!hasUpdate) return null;
           return {
             'tag_name': remoteVersion,
-            'html_url': 'https://github.com/$repository/releases/latest',
+            'html_url': 'https://v4.gh-proxy.org/https://github.com/$repository/releases/latest',
             'body': 'New version available. Please visit GitHub to download.',
           };
         }

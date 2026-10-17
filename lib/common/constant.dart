@@ -30,6 +30,10 @@ const moreDuration = Duration(milliseconds: 100);
 const animateDuration = Duration(milliseconds: 100);
 const midDuration = Duration(milliseconds: 200);
 const commonDuration = Duration(milliseconds: 300);
+// [Gamebox] Auto-check interval.
+// Upstream default is const Duration(days: 7).
+// Gamebox forces Duration(days: 1) so the user gets update prompts more
+// frequently. Sync upstream: keep this 1-day override.
 const defaultUpdateDuration = Duration(days: 1);
 const mmdbFileName = 'geoip.metadb';
 const asnFileName = 'ASN.mmdb';
@@ -43,10 +47,16 @@ const configKey = 'config';
 const customSidebarIconKey = 'custom_sidebar_icon';
 const customDashboardTitleKey = 'custom_dashboard_title';
 const double dialogCommonWidth = 300;
-// [Gamebox] 检查更新用的仓库。同步上游时把这里改成你自己的 GitHub 仓库（fork 或
-// Gamebox 专用仓库）。当前指向 mouren1988/Bettbox（你的 fork）。
-// 上游 Bettbox 默认值是 appshubcc/Bettbox，请不要无脑同步。
+// [Gamebox] Update-check repository. We wrap the raw GitHub URL in
+// v4.gh-proxy.org so the client can fetch version.json without going
+// through GitHub directly (some CN networks block raw.githubusercontent.com).
+// Upstream Bettbox default is appshubcc/Bettbox; Gamebox points to
+// mouren1988/Bettbox (the user's fork). Do NOT blindly sync upstream.
 const repository = 'mouren1988/Bettbox';
+// [Gamebox] Full version-check URL with gh-proxy mirror baked in.
+// Sync upstream: keep this URL intact even if upstream changes `repository`.
+const updateCheckUrl =
+    'https://v4.gh-proxy.org/https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';
 const ipInfoToken = String.fromEnvironment('IPINFO_TOKEN', defaultValue: '');
 const defaultExternalController = '127.0.0.1:9090';
 const maxMobileWidth = 600;

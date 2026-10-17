@@ -60,8 +60,12 @@ const List<DashboardWidget> defaultDashboardWidgets = [
   DashboardWidget.startButton,
 ];
 
+// [Gamebox] Outbound-mode cards removed from default dashboard (desktop+Android).
+// The DashboardWidget enum values (outboundMode / outboundModeV2) are
+// permanently removed upstream of this list; see lib/enum/enum.dart.
+// safeFromJson still handles stale config files that reference the old
+// enum names by falling back to the default widget list.
 const List<DashboardWidget> defaultAndroidDashboardWidgets = [
-  DashboardWidget.outboundModeV2,
   DashboardWidget.networkSpeed,
   DashboardWidget.trafficUsage,
   DashboardWidget.networkDetection,
@@ -125,8 +129,10 @@ List<DashboardWidget> desktopDashboardWidgetsSafeFromJson(
 
 // [Gamebox] 首页连通性测试默认三项。上游默认是 reddit、gemini、cloudflare�?
 // 同步时默认项按需求改�?spotify、discord、youtube�?
+// [Gamebox] Upstream pinned defaults: spotify, discord, youtube.
+// Gamebox swaps spotify -> gemini (gemini is more practical in CN use).
 const List<MediaPlatform> defaultPinnedMediaPlatforms = [
-  MediaPlatform.spotify,
+  MediaPlatform.gemini,
   MediaPlatform.discord,
   MediaPlatform.youtube,
 ];

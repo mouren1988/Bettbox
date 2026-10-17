@@ -76,16 +76,18 @@ flutter build windows --release --dart-define=APP_ENV=stable
 | 高优先级 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] 高优先级开启` |
 | 悬浮面板 | **开启** | `lib/models/config.dart` | `// [Gamebox] 悬浮面板开启` |
 | 联动开关 | **关闭** | `lib/models/config.dart` | `// [Gamebox] 联动开关默认关闭` |
-| 延迟动画 | **none**（UI 第一项"默认"） | `lib/models/config.dart` | `// [Gamebox] 延迟动画默认 none` |
+| 延迟动画 | **fast（50ms，UI 第一项）**（上游默认 standard/150ms） | `lib/models/generated/config.g.dart` | `// [Gamebox] 动画默认第一个（fast）` |
+| 回环保护 | **跟随上游**（`@Default(true)`） | `lib/models/config.dart` | `// [Gamebox] 跟随上游` |
 
 ### 1.5 检查更新
 
 | 项 | 值 | 文件 | 注释 |
 |---|---|---|---|
-| 检查更新端点 | `https://v4.gh-proxy.org/https://raw.githubusercontent.com/mouren1988/Bettbox/refs/heads/gamebox/version.json` | `lib/common/constant.dart` `lib/common/request.dart` | `// [Gamebox] 检查更新走 gh-proxy 镜像（直连 github 慢）` |
+| 检查更新端点 | `https://v4.gh-proxy.org/https://github.com/mouren1988/Bettbox/releases/latest`（gh-proxy 包裹的 GitHub releases 页面，仍走 302 → tag 解析） | `lib/common/request.dart` | `// [Gamebox] 检查更新走 gh-proxy 镜像` |
 | 仓库 | `mouren1988/Bettbox` | `lib/common/constant.dart` | `// [Gamebox] 仓库指向 fork（不上游原版）` |
-| 自动检查周期 | **3 天**（上游默认 28 天） | `lib/controller.dart` | `// [Gamebox] 自动检查周期改为 3 天` |
-| 触发时机 | 启动时 + 距上次 > 3 天 | `lib/controller.dart:1167` | `final forceCheck = (now - lastCheckTime) > const Duration(days: 3).inMilliseconds;` |
+| 全局 User-Agent | `Gamebox`（无版本号；上游是 `clash.meta`，本项目刻意不带版本号） | `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
+| 自动检查周期 | **1 天**（上游默认 28 天；常量 `defaultUpdateDuration`） | `lib/controller.dart` `lib/common/constant.dart` | `// [Gamebox] 自动检查周期改为 1 天` |
+| 触发时机 | 启动时 + 距上次 > 1 天 | `lib/controller.dart:1167` | `final forceCheck = (now - lastCheckTime) > defaultUpdateDuration.inMilliseconds;` |
 
 ### 1.6 应用标识
 
@@ -98,8 +100,8 @@ flutter build windows --release --dart-define=APP_ENV=stable
 
 | 项 | 说明 | 文件 | 注释 |
 |---|---|---|---|
-| 首页出站规则卡片 | **隐藏**（不让客户用全局） | `lib/pages/home.dart` | `// [Gamebox] 隐藏出站规则卡片` |
-| 连通性测试 URL | `gemini.com`（上游是 spotify） | `lib/views/dashboard/widgets/connectivity.dart` | `// [Gamebox] 连通性测试改为 gemini` |
+| 首页出站规则卡片 | **永久删除**（不让客户用全局；dashboard `DashboardWidget.outboundMode` 和 `outboundModeV2` 枚举值已从 `lib/enum/enum.dart` 删除，widget 文件保留为 stub；yaml 仍可启用全局模式） | `lib/enum/enum.dart` `lib/views/dashboard/widgets/outbound_mode.dart` | `// [Gamebox] 永久删除出站模式` |
+| 连通性测试置顶平台 | `gemini, discord, youtube`（上游是 `spotify, discord, youtube`） | `lib/models/config.dart` | `// [Gamebox] 置顶平台 spotify→gemini` |
 | 关于页 | **固定不随上游更新** | `lib/views/about.dart` | 见 §2 |
 | 贡献者头像 | 只显示 `mouren1988` 本地头像 | `lib/views/about.dart` `assets/images/avatars/mouren1988.jpg` | `// [Gamebox] 贡献者只显示仓库维护者` |
 | 关于页链接 | 使用说明 / 检查更新 / Telegram 群 / QQ 群 | `lib/views/about.dart` | `// [Gamebox] 关于页链接偏好` |

@@ -11,8 +11,9 @@ typedef HostsMap = Map<String, String>;
 
 // [Gamebox] Mihomo HTTP 全局 User-Agent 默认值。
 // 内核转发 HTTP 时会拿这个串代替原 UA，让代理后的目标站点能识别客户端。
-// 同步上游时如果改了 major 版本号，这里也要跟着改。
-const defaultGlobalUa = 'Gamebox/1.19.6';
+// 同步上游时上游如果改回带版本号（如 Gamebox/1.19.7），要同步改这里 ——
+// 但本项目刻意保持纯字符串 'Gamebox'（无版本号），避免每次升级都要改。
+const defaultGlobalUa = 'Gamebox';
 
 const defaultClashConfig = ClashConfig();
 

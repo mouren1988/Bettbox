@@ -73,12 +73,15 @@ _AppSettingProps _$AppSettingPropsFromJson(
   sidebarFlyout: json['sidebarFlyout'] as bool? ?? true,
   sidebarFlyoutOutsideTools:
       json['sidebarFlyoutOutsideTools'] as bool? ?? false,
+  // [Gamebox] Upstream default is standard(150ms); Gamebox defaults to fast
+  // (50ms) so the sidebar flyout responds snappier on the first hover.
+  // Sync upstream: keep SidebarFlyoutDelay.fast here.
   sidebarFlyoutDelay:
       $enumDecodeNullable(
         _$SidebarFlyoutDelayEnumMap,
         json['sidebarFlyoutDelay'],
       ) ??
-      SidebarFlyoutDelay.standard,
+      SidebarFlyoutDelay.fast,
   sidebarFlyoutEntries: json['sidebarFlyoutEntries'] == null
       ? defaultSidebarFlyoutEntries
       : sidebarFlyoutEntriesSafeFromJson(json['sidebarFlyoutEntries'] as List?),
@@ -160,8 +163,11 @@ const _$SidebarFlyoutDelayEnumMap = {
 const _$DashboardWidgetEnumMap = {
   DashboardWidget.networkSpeed: 'networkSpeed',
   DashboardWidget.networkSpeedSmall: 'networkSpeedSmall',
-  DashboardWidget.outboundModeV2: 'outboundModeV2',
-  DashboardWidget.outboundMode: 'outboundMode',
+  // [Gamebox] outboundMode / outboundModeV2 removed from enum.
+  // Backward-compat note: if a user has an old config.yaml that still
+  // contains "outboundMode" / "outboundModeV2", the safeFromJson catch
+  // block in lib/models/config.dart will swallow the Unknown enum error
+  // and fall back to the default widget list.
   DashboardWidget.userProfile: 'userProfile',
   DashboardWidget.trafficUsage: 'trafficUsage',
   DashboardWidget.networkDetection: 'networkDetection',

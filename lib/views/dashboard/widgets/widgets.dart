@@ -2,7 +2,8 @@ export 'intranet_ip.dart';
 export 'network_detection.dart';
 export 'network_speed.dart';
 export 'network_speed_small.dart';
-export 'outbound_mode.dart';
+// [Gamebox] outbound_mode.dart is removed (permanently disabled widget).
+// See lib/enum/enum.dart DashboardWidget enum for the rationale.
 export 'quick_options.dart';
 export 'traffic_usage.dart';
 export 'user_profile.dart';
