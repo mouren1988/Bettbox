@@ -504,19 +504,25 @@ abstract class Experimental with _$Experimental {
   }
 }
 
+// [Gamebox] GeoXUrl default URLs.
+// Upstream points straight to github.com releases, which is unreliable
+// on CN networks. Gamebox wraps each URL with v4.gh-proxy.org so the
+// Flutter HttpClient (used by the GEO updater) hits a CN mirror first
+// and only falls through to GitHub if the mirror fails.
+// Sync upstream: keep the gh-proxy prefix on the 3 URLs.
 @freezed
 abstract class GeoXUrl with _$GeoXUrl {
   const factory GeoXUrl({
     @Default(
-      'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
+      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
     )
     String mmdb,
     @Default(
-      'https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb',
+      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb',
     )
     String asn,
     @Default(
-      'https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
+      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
     )
     String geosite,
   }) = _GeoXUrl;

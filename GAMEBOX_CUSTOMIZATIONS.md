@@ -88,6 +88,7 @@ flutter build windows --release --dart-define=APP_ENV=stable
 | 全局 User-Agent | `Gamebox`（无版本号；上游是 `clash.meta`，本项目刻意不带版本号） | `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
 | 自动检查周期 | **1 天**（上游默认 28 天；常量 `defaultUpdateDuration`） | `lib/controller.dart` `lib/common/constant.dart` | `// [Gamebox] 自动检查周期改为 1 天` |
 | 触发时机 | 启动时 + 距上次 > 1 天 | `lib/controller.dart:1167` | `final forceCheck = (now - lastCheckTime) > defaultUpdateDuration.inMilliseconds;` |
+| GEO 内置资源 URL | 3 条全部加 `https://v4.gh-proxy.org/` 前缀：`mmdb`、`asn`、`geosite`（`lib/models/clash_config.dart:GeoXUrl`） | `lib/models/clash_config.dart` | `// [Gamebox] GeoXUrl default URLs` |
 
 ### 1.6 应用标识
 
