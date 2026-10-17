@@ -96,8 +96,10 @@ class UserProfileCard extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(16.ap, 10.ap, 8.ap, 6.ap),
               child: Row(
                 children: [
+                  // [Gamebox] 标题是用户名，用 person_outline 比 cloud_upload_outlined
+                  // 更贴切。颜色与连通性卡片 network_check 一样用 onSurfaceVariant。
                   Icon(
-                    Icons.cloud_upload_outlined,
+                    Icons.person_outline,
                     size: 18.ap,
                     color: color,
                   ),
