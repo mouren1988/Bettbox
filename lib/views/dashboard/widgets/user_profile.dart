@@ -93,14 +93,15 @@ class UserProfileCard extends ConsumerWidget {
           children: [
             Padding(
               // [Gamebox] 与连通性卡片同一套标题行边距，同步按钮贴在右上角。
-              padding: EdgeInsets.fromLTRB(16.ap, 10.ap, 8.ap, 6.ap),
+              // 高度按 titleMedium 算，跟 IP/连通性卡片纵向空间一致。
+              padding: EdgeInsets.fromLTRB(16.ap, 8.ap, 8.ap, 8.ap),
               child: Row(
                 children: [
                   // [Gamebox] 标题是用户名，用 person_outline 比 cloud_upload_outlined
-                  // 更贴切。颜色与连通性卡片 network_check 一样用 onSurfaceVariant。
+                  // 更贴切。颜色与连通性卡片 network_check 一样用 onSurfaceVariant，
+                  // 图标 24 默认值也和 IP 卡片一致。
                   Icon(
                     Icons.person_outline,
-                    size: 18.ap,
                     color: color,
                   ),
                   const SizedBox(width: 8),
