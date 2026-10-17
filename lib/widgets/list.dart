@@ -571,6 +571,8 @@ class SectionContainer extends StatelessWidget {
   final bool separated;
   final bool plain;
   final bool isFirst;
+  // [Gamebox] 传给 CommonCard 的 textColor，仅 non-plain 模式生效。
+  final Color? textColor;
 
   const SectionContainer({
     super.key,
@@ -580,6 +582,7 @@ class SectionContainer extends StatelessWidget {
     this.separated = true,
     this.plain = false,
     this.isFirst = false,
+    this.textColor,
   });
 
   @override
@@ -616,6 +619,7 @@ class SectionContainer extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
           child: CommonCard(
             type: CommonCardType.filled,
+            textColor: textColor,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -866,6 +870,7 @@ List<Widget> generateSection({
   bool separated = true,
   bool plain = false,
   bool isFirst = false,
+  Color? textColor,
 }) {
   return [
     SectionContainer(
@@ -875,6 +880,7 @@ List<Widget> generateSection({
       separated: separated,
       plain: plain,
       isFirst: isFirst,
+      textColor: textColor,
     ),
   ];
 }

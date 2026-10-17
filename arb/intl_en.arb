@@ -345,7 +345,7 @@
   "proxyGroup": "Proxy Group",
   "go": "Go",
   "externalLink": "External Link",
-  "otherContributors": "Other Contributors (Random Order)",
+  "otherContributors": "Contributors",
   "autoCloseConnections": "Auto-Close Connections",
   "autoCloseConnectionsDesc": "Close connections when switching nodes",
   "relatedSettings": "Related Settings",

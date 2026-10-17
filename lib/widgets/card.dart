@@ -92,6 +92,7 @@ class CommonCard extends StatelessWidget {
     this.info,
     this.clipBehavior = Clip.antiAlias,
     this.elevated = true,
+    this.textColor,
   }) : isSelected = isSelected ?? false;
 
   final bool enterAnimated;
@@ -106,6 +107,10 @@ class CommonCard extends StatelessWidget {
   final double? radius;
   final Clip clipBehavior;
   final bool elevated;
+  // [Gamebox] 自定义 OutlinedButton 内部文字/图标色。默认 null = M3 原色
+  // （primary 浅色调）。传 onSurface 时显式锁定文字色，绕开 OutlinedButton
+  // 内部 AnimatedDefaultTextStyle 的 primary 套色。
+  final Color? textColor;
 
   // final WidgetStateProperty<Color?>? backgroundColor;
   // final WidgetStateProperty<BorderSide?>? borderSide;
@@ -187,8 +192,17 @@ class CommonCard extends StatelessWidget {
       style: ButtonStyle(
         padding: const WidgetStatePropertyAll(EdgeInsets.zero),
         shape: WidgetStatePropertyAll(shape),
-        iconColor: WidgetStatePropertyAll(context.colorScheme.primary),
+        iconColor: WidgetStatePropertyAll(
+          textColor ?? context.colorScheme.primary,
+        ),
         iconSize: WidgetStateProperty.all(20),
+        // [Gamebox] 默认 null 保持 OutlinedButton M3 原色（foregroundColor=
+        // primary，但 child Text 实际渲染走 textStyle.labelLarge 默认
+        // onSurface）。设 onSurface 时把 text 显式锁成 onSurface，避免深色
+        // 主题下 OutlinedButton 内部 child Text 被套成 primary 灰。
+        foregroundColor: textColor == null
+            ? null
+            : WidgetStatePropertyAll(textColor),
         backgroundColor: WidgetStateProperty.resolveWith(
           (states) => getBackgroundColor(context, states),
         ),

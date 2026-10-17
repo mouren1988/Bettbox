@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/providers/config.dart';
 import 'package:bett_box/state.dart';
 import 'package:bett_box/widgets/widgets.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 @immutable
@@ -39,71 +38,38 @@ class AboutView extends StatelessWidget {
   }
 
   List<Widget> _buildMoreSection(BuildContext context) {
-    // [Gamebox] 关于页链接。上游是 Github Releases、Telegram Group、Channel、FlClash、Mihomo。
+    // [Gamebox] 复古到上游 1.19.4 风格：2列网格 + 纯文字 + 右侧 16px 小图标，
+    // 去掉彩色方块 / prefix / external 角标，让“更多”区回归简洁。
+    // 只保留 4 项：使用说明 / 检查更新 / Telegram群组 / QQ交流群。
+    // [Gamebox] 显式传 textColor: onSurface 把 OutlinedButton 内部文字色
+    // 从 colorScheme.primary（深色主题下偏淡蓝/淡紫）改为 onSurface（白），
+    // 避免 M3 AnimatedDefaultTextStyle 的 primary 套色。
     return generateSection(
       title: appLocalizations.more,
+      textColor: context.colorScheme.onSurface,
       items: [
         _LinkGridRow(
-          left: _LinkTile(
+          left: _LinkGridTile(
             title: '使用说明',
-            // [Gamebox] 沿用上游 Github Releases 的星星图标，只改打开的是使用说明。
             icon: Icons.star,
             onTap: () => globalState.openUserManual(),
           ),
-          right: _LinkTile(
+          right: _LinkGridTile(
             title: appLocalizations.checkUpdate,
             icon: Icons.refresh,
             onTap: () => _checkUpdate(context),
           ),
         ),
         _LinkGridRow(
-          left: _LinkTile(
-            // [Gamebox] 上游文案是 Telegram Group。
+          left: _LinkGridTile(
             title: 'Telegram群组',
-            icon: Icons.launch,
+            icon: Icons.open_in_new,
             onTap: () => globalState.openUrl(_groupUrl),
           ),
-          right: _LinkTile(
+          right: _LinkGridTile(
             title: 'QQ交流群',
-            icon: Icons.launch,
+            icon: Icons.open_in_new,
             onTap: () => globalState.openUrl(_qqGroupUrl),
-          ),
-        ),
-        _LinkGridRow(
-          left: _LinkTile(
-            title: 'Github Releases',
-            icon: Icons.star,
-            external: true,
-            // [Gamebox] 同步上游时把这个链接改成你自己的仓库。
-            onTap: () => globalState.openUrl(
-              'https://github.com/mouren1988/Bettbox',
-            ),
-          ),
-          right: _LinkTile(
-            title: 'Channel',
-            icon: Icons.campaign_outlined,
-            external: true,
-            onTap: () => globalState.openUrl(
-              'https://telegram.me/appshub_channel',
-            ),
-          ),
-        ),
-        _LinkGridRow(
-          left: _LinkTile(
-            prefix: 'Forked from',
-            title: 'FlClash',
-            icon: Icons.code,
-            onTap: () => globalState.openUrl(
-              'https://github.com/chen08209/FlClash',
-            ),
-          ),
-          right: _LinkTile(
-            prefix: 'Powered by',
-            title: 'Mihomo',
-            icon: Icons.memory,
-            onTap: () => globalState.openUrl(
-              'https://github.com/MetaCubeX/mihomo',
-            ),
           ),
         ),
       ],
@@ -112,7 +78,7 @@ class AboutView extends StatelessWidget {
 
   List<Widget> _buildContributorsSection() {
     // ===== [Gamebox] 关于页 → 其他贡献者 =====
-    // 上游：随机滚动显示一批开源贡献者头像。
+    // 上游 1.19.4：随机滚动显示一批开源贡献者头像。
     // Gamebox：只显示仓库维护者 mouren1988 的头像（_repoAvatar）。
     // 头像文件位置：assets/images/avatars/mouren1988.jpg
     // 同步上游时如果把头像换成自己的，**必须用二进制方式提交**（不要用
@@ -123,13 +89,19 @@ class AboutView extends StatelessWidget {
       title: appLocalizations.otherContributors,
       items: [
         ListItem(
-          title: const Align(
-            alignment: Alignment.centerLeft,
-            child: Avatar(
-              contributor: Contributor(
-                avatar: _repoAvatar,
-                name: 'mouren1988',
-              ),
+          title: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Wrap(
+              spacing: 24,
+              children: const [
+                Avatar(
+                  contributor: Contributor(
+                    avatar: _repoAvatar,
+                    name: 'mouren1988',
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -139,11 +111,33 @@ class AboutView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // [Gamebox] 顶层那个 ListTile(title: Column(...)) 直接放在 generateListView
+    // 的 items 数组里时，运行时 Flutter 抛 "ListTile widgets require a Material
+    // widget ancestor" 异常（generateListView 的兜底 Padding + CommonCard
+    // 里 OutlinedButton 提供的 Material 跨了 LookupBoundary，仍然不满足
+    // ListTile 的 debugCheckHasMaterial 检查），结果整页只剩一个红屏错误
+    // 块，所有正常内容都看不见。
+    // 在 ListTile 外面套一层 Material(type: transparency) 显式提供一个
+    // Material 祖先，是最稳的修法（不影响 ListTile 的视觉外观，transparency
+    // 不会画任何背景）。同步上游时如果 ListTile 被改成别的 widget，确认
+    // 父链里有 Material 即可。
     final items = [
-      ListTile(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      // [Gamebox] 顶层那个 ListTile 直接放在 generateListView 的 items 数组
+      // 里时，运行时 Flutter 抛 "ListTile widgets require a Material widget
+      // ancestor" 异常，整页空白（截图见用户报告）。
+      // 原因：generateListView 的兜底分支用 Padding + CommonCard 包 ListTile，
+      // CommonCard 内 OutlinedButton 提供的 Material 跨了 LookupBoundary，
+      // 仍然不满足 ListTile 的 debugCheckHasMaterial 检查。
+      // 最稳的修法：直接在 ListTile 外面套一层 Material(type: transparency)
+      // 显式提供 Material 祖先（transparency 不画任何背景，不影响视觉）。
+      // 同步上游时如果 ListTile 被换成别的 widget，确认父链里有 Material 即可。
+      Material(
+        type: MaterialType.transparency,
+        child: ListItem(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Consumer(
               builder: (_, ref, _) {
                 return _DeveloperModeDetector(
@@ -164,11 +158,26 @@ class AboutView extends StatelessWidget {
                         children: [
                           Text(
                             appName,
-                            style: Theme.of(context).textTheme.headlineSmall,
+                            // [Gamebox] 显式 onSurface：ListItem 内部
+                            // ListTile 在 OutlinedButton 内时，ListTile
+                            // 透传的 titleTextStyle 没指定 color，会被
+                            // Material AnimatedDefaultTextStyle 套成
+                            // colorScheme.primary。
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  color: context.colorScheme.onSurface,
+                                ),
                           ),
                           Text(
                             '${globalState.packageInfo.version}+${globalState.packageInfo.buildNumber}',
-                            style: Theme.of(context).textTheme.labelLarge,
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(
+                                  color: context.colorScheme.onSurface,
+                                ),
                           ),
                         ],
                       ),
@@ -190,9 +199,13 @@ class AboutView extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               appLocalizations.desc,
-              style: Theme.of(context).textTheme.bodySmall,
+              // [Gamebox] 同上，显式 onSurface 锁死文字色。
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: context.colorScheme.onSurface,
+              ),
             ),
           ],
+        ),
         ),
       ),
       const SizedBox(height: 12),
@@ -270,174 +283,86 @@ class _DeveloperModeDetectorState extends State<_DeveloperModeDetector> {
   }
 }
 
-class _ContributorsRow extends StatefulWidget {
-  final List<Contributor> contributors;
+class _LinkGridRow extends StatelessWidget {
+  final _LinkGridTile left;
+  final _LinkGridTile right;
 
-  const _ContributorsRow({required this.contributors});
-
-  @override
-  State<_ContributorsRow> createState() => _ContributorsRowState();
-}
-
-class _ContributorsRowState extends State<_ContributorsRow> {
-  final _controller = ScrollController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Shader _createEdgeShader(Rect rect) {
-    final position = _controller.hasClients ? _controller.position : null;
-    final hasBefore = position != null && position.extentBefore > 0;
-    final hasAfter = position == null || position.extentAfter > 0;
-    return LinearGradient(
-      colors: [
-        hasBefore ? Colors.transparent : Colors.white,
-        Colors.white,
-        Colors.white,
-        hasAfter ? Colors.transparent : Colors.white,
-      ],
-      stops: const [0, 0.1, 0.9, 1],
-    ).createShader(rect);
-  }
+  const _LinkGridRow({required this.left, required this.right});
 
   @override
   Widget build(BuildContext context) {
-    return ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(
-        scrollbars: false,
-        dragDevices: PointerDeviceKind.values.toSet(),
-      ),
-      child: MediaQuery.removePadding(
-        context: context,
-        removeLeft: true,
-        removeTop: true,
-        removeRight: true,
-        removeBottom: true,
-        child: Scrollbar(
-          controller: _controller,
-          thumbVisibility: true,
-          thickness: 4,
-          radius: const Radius.circular(2),
-          child: ShaderMask(
-            shaderCallback: _createEdgeShader,
-            blendMode: BlendMode.dstIn,
-            child: SingleChildScrollView(
-              controller: _controller,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Wrap(
-                spacing: 24,
-                children: [
-                  for (final contributor in widget.contributors)
-                    Avatar(contributor: contributor),
-                ],
-              ),
+    final dividerColor = context.colorScheme.outlineVariant.withValues(
+      alpha: context.colorScheme.brightness == Brightness.light ? 0.6 : 0.45,
+    );
+    // [Gamebox] _LinkGridTile 内部用了 InkWell，需要 Material 祖先。
+    // 这个 Row 在 generateListView 兜底的 CommonCard(OutlinedButton) 内，
+    // 但 material_ui 的 Scaffold 创建的 LookupBoundary 把 ListView 与外层
+    // Material 隔开，OutlinedButton 提供的 Material 跨了边界，InkWell 仍
+    // 报 "No Material widget found"。显式包一层 transparency Material
+    // 修复（不画任何背景，不影响视觉）。
+    return Material(
+      type: MaterialType.transparency,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: left),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              indent: 8,
+              endIndent: 8,
+              color: dividerColor,
             ),
-          ),
+            Expanded(child: right),
+          ],
         ),
       ),
     );
   }
 }
 
-class _LinkGridRow extends StatelessWidget {
-  final _LinkTile left;
-  final _LinkTile right;
-
-  const _LinkGridRow({required this.left, required this.right});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(child: left),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            indent: 10,
-            endIndent: 10,
-            color: colorScheme.outlineVariant.withValues(
-              alpha: colorScheme.brightness == Brightness.light ? 0.6 : 0.45,
-            ),
-          ),
-          Expanded(child: right),
-        ],
-      ),
-    );
-  }
-}
-
-class _LinkTile extends StatelessWidget {
-  final String? prefix;
+class _LinkGridTile extends StatelessWidget {
   final String title;
-  final IconData icon;
-  final bool external;
+  final IconData? icon;
   final VoidCallback onTap;
 
-  const _LinkTile({
-    this.prefix,
-    required this.title,
-    required this.icon,
-    this.external = true,
-    required this.onTap,
-  });
+  const _LinkGridTile({required this.title, this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    final prefix = this.prefix;
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.opacity12,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, size: 19, color: colorScheme.primary),
+            Expanded(
+              child: Text(
+                title,
+                // [Gamebox] 必须显式 copyWith(color: onSurface)。Text style
+                // 不指定 color 时，OutlinedButton 内部的 AnimatedDefaultTextStyle
+                // 会用 labelLarge.copyWith(color: primary) 兜底渲染，导致所有
+                // title 文字呈 primary 淡色。显式锁定 onSurface 后，Text 自身
+                // 的 effective color 才是 onSurface，merge 不会回退。
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.colorScheme.onSurface,
                 ),
-                const Spacer(),
-                Icon(
-                  external ? Icons.arrow_outward : Icons.arrow_forward,
-                  size: 16,
-                  color: colorScheme.onSurfaceVariant.opacity50,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text.rich(
-              TextSpan(
-                children: [
-                  if (prefix != null)
-                    TextSpan(
-                      text: '$prefix ',
-                      style: context.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant.opacity80,
-                      ),
-                    ),
-                  TextSpan(text: title),
-                ],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: context.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (icon != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                icon,
+                size: 16,
+                // [Gamebox] 跟 title 一样显式锁 onSurface，避免被
+                // OutlinedButton 内部 AnimatedDefaultTextStyle 的
+                // iconColor(primary) 套色覆盖。
+                color: context.colorScheme.onSurface,
+              ),
+            ],
           ],
         ),
       ),

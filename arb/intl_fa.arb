@@ -345,7 +345,7 @@
   "proxyGroup": "گروه پروکسی",
   "go": "رفتن",
   "externalLink": "لینک خارجی",
-  "otherContributors": "مشارکت‌کنندگان دیگر (ترتیب تصادفی)",
+  "otherContributors": "مشارکت‌کنندگان",
   "autoCloseConnections": "بستن خودکار اتصالات",
   "autoCloseConnectionsDesc": "قطع خودکار اتصالات هنگام تغییر نود",
   "relatedSettings": "تنظیمات مرتبط",

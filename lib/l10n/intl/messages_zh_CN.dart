@@ -281,7 +281,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "deleteTip": m3,
     "deleteTunnel": MessageLookupByLibrary.simpleMessage("删除转发"),
     "desc": MessageLookupByLibrary.simpleMessage(
-      "Gamebox 基于强大灵活的 Mihomo 内核深度打造，致力于更好的客户端体验，我们的愿景: Connecting Open Source and AI，Accelerating Innovation",
+      "Gamebox 基于强大灵活的 Mihomo 内核深度打造，致力于更好的客户端体验。",
     ),
     "destination": MessageLookupByLibrary.simpleMessage("目标地址"),
     "destinationGeoIP": MessageLookupByLibrary.simpleMessage("目标地理定位"),
@@ -667,7 +667,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "options": MessageLookupByLibrary.simpleMessage("选项"),
     "organizationDomain": MessageLookupByLibrary.simpleMessage("组织 / 域名"),
     "other": MessageLookupByLibrary.simpleMessage("其他"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage("其他贡献者(随机排序)"),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("贡献者"),
     "otherSettings": MessageLookupByLibrary.simpleMessage("增强工具"),
     "otherSettingsDesc": MessageLookupByLibrary.simpleMessage("修改增强工具设置"),
     "outboundMode": MessageLookupByLibrary.simpleMessage("出站模式"),

@@ -3,7 +3,8 @@ import 'dart:io';
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
-import 'package:bett_box/l10n/l10n.dart';
+// [Gamebox] l10n.dart 通过 common.dart → app_localizations.dart 间接 import，
+// 这里直接 import 反而被 flutter analyze 判 unused_import。
 import 'package:bett_box/models/models.dart';
 import 'package:bett_box/providers/providers.dart';
 import 'package:bett_box/state.dart';
@@ -1541,34 +1542,28 @@ class _LocaleItem extends ConsumerWidget {
   // - 保留入口是为了方便临时切到英语/俄语等调试界面，不会持久化。
   const _LocaleItem();
 
-  static final List<Locale> _localeOptions = _getOrderedLocales();
-  static const Map<String, String> _nativeLocaleNames = {
-    'zh_CN': '简体中文',
-    'zh_TC': '繁體中文',
-    'en': 'English',
-    'ru': 'Русский',
-    'fa': 'فارسی',
-    'ja': '日本語',
-    'ko': '한국어',
-  };
+  // [Gamebox] 语言入口只保留简体中文。
+  // - MaterialApp.locale 永远写死 zh-Hans-CN，其他 6 个 locale 选项
+  //   实际选中后只是改 appSetting.locale（下次冷启动被覆盖回 zh-Hans-CN），
+  //   没有可见效果。
+  // - 既然选别的没用，Radio 列表就只展示 zh_CN 唯一一项，避免误导用户。
+  // - 老的 appSetting.locale 如果是 en/ja/... 仍能持久化（不强行擦），
+  //   防止破坏已有用户的偏好存储；只是显示时强制只 zh_CN。
+  static final List<Locale> _localeOptions = const [
+    Locale.fromSubtags(
+      languageCode: 'zh',
+      scriptCode: 'Hans',
+      countryCode: 'CN',
+    ),
+  ];
 
-  static List<Locale> _getOrderedLocales() {
-    final priority = ['zh_CN', 'zh_TC', 'en', 'ru', 'fa', 'ja', 'ko'];
-    final locales = List<Locale>.from(
-      AppLocalizations.delegate.supportedLocales,
-    );
-    locales.sort((a, b) {
-      final aKey = a.toString();
-      final bKey = b.toString();
-      final aIndex = priority.indexOf(aKey);
-      final bIndex = priority.indexOf(bKey);
-      if (aIndex != -1 && bIndex != -1) return aIndex.compareTo(bIndex);
-      if (aIndex != -1) return -1;
-      if (bIndex != -1) return 1;
-      return aKey.compareTo(bKey);
-    });
-    return locales;
-  }
+  static const Map<String, String> _nativeLocaleNames = {
+    // [Gamebox] 字典保留原 key 不动。zh_CN 是老 Locale('zh','CN').toString()，
+    // zh_Hans_CN 是新的 Locale.fromSubtags(languageCode:'zh', scriptCode:'Hans',
+    // countryCode:'CN').toString()，两条都映射到同一个中文名「简体中文」。
+    'zh_CN': '简体中文',
+    'zh_Hans_CN': '简体中文',
+  };
 
   String _getLocaleString(Locale locale) {
     return _nativeLocaleNames[locale.toString()] ?? locale.toString();
@@ -1576,11 +1571,10 @@ class _LocaleItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final locale = ref.watch(
-      appSettingProvider.select((state) => state.locale),
-    );
-    final currentLocale =
-        utils.getLocaleForString(locale) ?? utils.getSystemLocale();
+    // [Gamebox] 即使 appSetting.locale 持久化的是老值（en/ja/...），
+    // 实际显示永远 zh-Hans-CN，所以 currentLocale 强行落到 _localeOptions
+    // 的唯一项上，保证 Radio 始终选中「简体中文」。
+    final currentLocale = _localeOptions.first;
     return ListItem<Locale>.options(
       leading: const Icon(Icons.language_outlined),
       title: Text(appLocalizations.language),
@@ -1589,12 +1583,10 @@ class _LocaleItem extends ConsumerWidget {
         title: appLocalizations.language,
         options: _localeOptions,
         onChanged: (Locale? locale) {
+          // [Gamebox] Radio 仍然允许点击（保留交互），但切换后没效果
+          // （MaterialApp.locale 是写死的），所以这里直接不写回。
+          // 这样 Radio 永远显示选中 zh_CN，行为一致。
           if (locale == null) return;
-          ref
-              .read(appSettingProvider.notifier)
-              .updateState(
-                (state) => state.copyWith(locale: locale.toString()),
-              );
         },
         textBuilder: (locale) => _getLocaleString(locale),
         value: currentLocale,
