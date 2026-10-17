@@ -311,18 +311,16 @@ begin
 end;
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-{% if LOCALES %}
 {% for locale in LOCALES %}
 {% if locale.lang == 'zh' %}
 Name: "chineseSimplified"; MessagesFile: {% if locale.file %}{{ locale.file }}{% else %}"compiler:Languages\\ChineseSimplified.isl"{% endif %}
 {% endif %}
 {% endfor %}
-{% endif %}
 
 [CustomMessages]
-english.ShuttingDownRunningApp=Shutting down running {{DISPLAY_NAME}}...
-english.RemoveUserDataPrompt=Do you want to remove all user data?%n%nThis will remove:%n• Configuration files%n• Profiles and subscriptions%n• Settings and preferences%n• Registry entries%n%nThis action cannot be undone.
+; [Gamebox] 只保留简体中文 CustomMessages，删掉 hardcoded english 段。
+; 原因：[Languages] 段只声明 chineseSimplified，没有 Name: "english"，
+; ISCC 编译会报 "Unknown language name "english"" 错。
 {% if LOCALES %}
 {% for locale in LOCALES %}
 {% if locale.lang == 'zh' %}

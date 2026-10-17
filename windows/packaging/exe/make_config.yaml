@@ -10,9 +10,10 @@ executable_name: Gamebox.exe
 output_base_file_name: Gamebox.exe
 setup_icon_file: ..\windows\runner\resources\app_icon.ico
 locales:
+  # [Gamebox] 只保留简体中文：去掉 en，避免安装器弹出 language
+  # dialog（语言选择界面）。同步 inno_setup.iss 也只渲染 chineseSimplified。
   - lang: zh
     file: ..\windows\packaging\exe\ChineseSimplified.isl
-  - lang: en
 privileges_required: admin
 # [Gamebox] Desktop shortcut enabled by default (inno_setup.iss no longer toggles unchecked/checkedonce).
 create_desktop_icon: true
