@@ -111,6 +111,7 @@ flutter build windows --release --dart-define=APP_ENV=stable
 | 仓库 | `mouren1988/Bettbox`（URL 模板里用 `$repository` 拼，sync 上游时务必确认这里指向 fork） | `lib/common/constant.dart` | `// [Gamebox] 仓库指向 fork（不上游原版）` |
 | 数据源 | `gamebox` 分支根目录下的 `version.json`（**不**走 GitHub releases；用户不想发版） | `lib/common/constant.dart` | `const updateCheckUrl = 'https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';` |
 | `version.json` 字段 | `{ "version": "1.19.5+2026100101", "notes": "" }`（`version` 包含 `+build` 后缀；`notes` 是 changelog 文本，可空字符串） | `https://github.com/mouren1988/Bettbox/blob/gamebox/version.json` | 用户自己维护；同步 `packageInfo.version+buildNumber` |
+| `version.json.notes` 约定 | **只写版本号本身**（如 `"v1.19.6"`）—— 整个字符串直接显示在「发现新版本」弹窗正文里。**不要**写 changelog 列表（弹窗只展示一两句，太长用户不愿看） | `version.json` | 每次发版改 version 即可，notes 跟 version 同步（如 `v1.19.7`） |
 | 下载链接 | `https://v10.lanzoup.com/b013a2b1wh`（蓝奏云盘，**不**走 GitHub releases） | `lib/common/constant.dart` | `const downloadUrl = 'https://v10.lanzoup.com/b013a2b1wh';` |
 | 客户端映射 | `version.json.version` → 显示给用户的「发现新版本」标题；`version.json.notes` → 弹窗正文；`downloadUrl` → 「前往下载」按钮的链接 | `lib/common/request.dart` `checkForUpdate()` | 内部用 `tag_name`/`body` 字段返回（兼容下游 controller / about 零改动） |
 | 全局 User-Agent | `Gamebox`（无版本号；上游 Bettbox 是 `clash.meta`，本项目刻意不带版本号） | `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
