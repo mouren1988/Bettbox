@@ -80,7 +80,7 @@ class UserProfileCard extends ConsumerWidget {
     final used = (info?.upload ?? 0) + (info?.download ?? 0);
     final traffic = info == null
         ? '-'
-        : '${_trafficGb(used)} / ${_trafficGb(info.total)}';
+        : '${_trafficAuto(used)} / ${_trafficAuto(info.total)}';
     final expire = info?.expire ?? 0;
     final syncedAt = profile?.lastUpdateDate;
     final expireSoon = _expiringSoon(expire);
@@ -211,14 +211,21 @@ bool _expiringSoon(int expire) {
   return remaining > Duration.zero && remaining < const Duration(days: 3);
 }
 
-// [Gamebox] 订阅流量只显示 GB。整数不带小数，其余保留两位。
-String _trafficGb(int bytes) {
+// [Gamebox] 订阅流量自适应单位：
+//   <  1024 GB →  GB（整数不带小数，其余两位）
+//   >= 1024 GB →  TB（同上规则）
+// 100 GB / 1.23 TB 这种长度，跟用户名字数差不多不挤行。
+String _trafficAuto(int bytes) {
   if (bytes <= 0) return '0 GB';
   final gb = bytes / 1024 / 1024 / 1024;
-  final text = gb.toStringAsFixed(2);
-  if (text.endsWith('.00')) {
-    return '${gb.round()} GB';
+  if (gb >= 1024) {
+    final tb = gb / 1024;
+    final text = tb.toStringAsFixed(2);
+    if (text.endsWith('.00')) return '${tb.round()} TB';
+    return '$text TB';
   }
+  final text = gb.toStringAsFixed(2);
+  if (text.endsWith('.00')) return '${gb.round()} GB';
   return '$text GB';
 }
 
