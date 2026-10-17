@@ -3,6 +3,19 @@
 > 本文件记录 Gamebox 相对 upstream Bettbox 的所有定制化修改。
 > 任何修改都要带 `// [Gamebox]` 注释，并同步更新本文件。
 
+**当前 gamebox 分支 HEAD：`0667de06`**（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
+`e586a312` 之后追加的提交：
+1. `69703ac0` — re-apply customizations (UA, 1d update, fast animation, remove outbound-mode, gemini, gh-proxy mirror)
+2. `53c204ab` — wrap GeoXUrl default URLs with v4.gh-proxy.org mirror
+3. `0667de06` — patch generated deserializer + BundleMRS URL with gh-proxy
+
+**未提交的工作区改动（建议审核后 commit）**：
+- `lib/models/generated/clash_config.g.dart` — `_GeoXUrlFromJson` 3 条 URL 去掉 gh-proxy 前缀（**回滚到上游**）
+- `lib/views/resources.dart` — BundleMRS.7z URL 去掉 gh-proxy 前缀（**回滚到上游**）
+- `lib/common/constant.dart` — 新增 `downloadUrl` 蓝奏云盘链接；`updateCheckUrl` 改为 `raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json`（**不再走 gh-proxy 也不再走 GitHub releases**）
+- `lib/common/request.dart` — `checkForUpdate()` 重写：直接 GET `updateCheckUrl` 读 JSON，期望字段 `version` / `notes`（内部映射成 `tag_name` / `body` 保持调用方零改动）；`html_url` 固定为 `downloadUrl`
+- `GAMEBOX_CUSTOMIZATIONS.md` — §1.5 同步：删除 GEO 行；新增 downloadUrl + `version.json` schema
+
 ---
 
 ## 0. 同步上游 SOP（重要）
@@ -61,7 +74,10 @@ flutter build windows --release --dart-define=APP_ENV=stable
 | 查找进程 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] 查找进程默认开启` |
 | 外部控制 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] 外部控制默认开启` |
 | 控制密码 | **空** | `lib/models/clash_config.dart` | `// [Gamebox] 控制密码为空` |
-| 全局 User-Agent | `Gamebox/1.19.6` | `lib/models/clash_config.dart` | `// [Gamebox] 全局 UA` |
+| 全局 User-Agent | `Gamebox`（无版本号；上游 Bettbox 是 `clash.meta`，本项目刻意不带版本号） | `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
+| BundleMRS.7z URL | `https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/BundleMRS.7z`（上游是 GitHub 直连） | `lib/views/resources.dart` | `// [Gamebox] BundleMRS.7z via gh-proxy mirror` |
+| GEO 默认 URL（生成器） | 3 条全部加 `https://v4.gh-proxy.org/` 前缀：`mmdb` / `asn` / `geosite`（`lib/models/generated/clash_config.g.dart:_GeoXUrlFromJson`） | `lib/models/generated/clash_config.g.dart` | `// [Gamebox] Mirrors of GitHub releases via v4.gh-proxy.org` |
+| GEO 默认 URL（源码） | 同上，3 条 `@Default()` 全部加 `https://v4.gh-proxy.org/` 前缀（`lib/models/clash_config.dart:GeoXUrl`） | `lib/models/clash_config.dart` | `// [Gamebox] GeoXUrl default URLs` |
 | 虚拟网卡 | **开启（桌面端）** | `lib/models/clash_config.dart` | `// [Gamebox] 桌面端默认开启虚拟网卡` |
 | 系统代理 | **关闭** | `lib/models/clash_config.dart` | `// [Gamebox] 系统代理默认关闭` |
 | ICMP 转发 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] ICMP 转发默认开启` |
@@ -83,12 +99,15 @@ flutter build windows --release --dart-define=APP_ENV=stable
 
 | 项 | 值 | 文件 | 注释 |
 |---|---|---|---|
-| 检查更新端点 | `https://v4.gh-proxy.org/https://github.com/mouren1988/Bettbox/releases/latest`（gh-proxy 包裹的 GitHub releases 页面，仍走 302 → tag 解析） | `lib/common/request.dart` | `// [Gamebox] 检查更新走 gh-proxy 镜像` |
-| 仓库 | `mouren1988/Bettbox` | `lib/common/constant.dart` | `// [Gamebox] 仓库指向 fork（不上游原版）` |
-| 全局 User-Agent | `Gamebox`（无版本号；上游是 `clash.meta`，本项目刻意不带版本号） | `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
+| 检查更新端点 | `https://raw.githubusercontent.com/mouren1988/Bettbox/refs/heads/gamebox/version.json`（直接读 fork 的 `gamebox` 分支根目录的 `version.json`） | `lib/common/request.dart` `lib/common/constant.dart` | `// [Gamebox] 检查更新走 raw.githubusercontent.com 读 fork 的 gamebox 分支上的 version.json` |
+| 仓库 | `mouren1988/Bettbox`（URL 模板里用 `$repository` 拼，sync 上游时务必确认这里指向 fork） | `lib/common/constant.dart` | `// [Gamebox] 仓库指向 fork（不上游原版）` |
+| 数据源 | `gamebox` 分支根目录下的 `version.json`（**不**走 GitHub releases；用户不想发版） | `lib/common/constant.dart` | `const updateCheckUrl = 'https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';` |
+| `version.json` 字段 | `{ "version": "1.19.5+2026100101", "notes": "" }`（`version` 包含 `+build` 后缀；`notes` 是 changelog 文本，可空字符串） | `https://github.com/mouren1988/Bettbox/blob/gamebox/version.json` | 用户自己维护；同步 `packageInfo.version+buildNumber` |
+| 下载链接 | `https://v10.lanzoup.com/b013a2b1wh`（蓝奏云盘，**不**走 GitHub releases） | `lib/common/constant.dart` | `const downloadUrl = 'https://v10.lanzoup.com/b013a2b1wh';` |
+| 客户端映射 | `version.json.version` → 显示给用户的「发现新版本」标题；`version.json.notes` → 弹窗正文；`downloadUrl` → 「前往下载」按钮的链接 | `lib/common/request.dart` `checkForUpdate()` | 内部用 `tag_name`/`body` 字段返回（兼容下游 controller / about 零改动） |
+| 全局 User-Agent | `Gamebox`（无版本号；上游 Bettbox 是 `clash.meta`，本项目刻意不带版本号） | `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
 | 自动检查周期 | **1 天**（上游默认 28 天；常量 `defaultUpdateDuration`） | `lib/controller.dart` `lib/common/constant.dart` | `// [Gamebox] 自动检查周期改为 1 天` |
 | 触发时机 | 启动时 + 距上次 > 1 天 | `lib/controller.dart:1167` | `final forceCheck = (now - lastCheckTime) > defaultUpdateDuration.inMilliseconds;` |
-| GEO 内置资源 URL | 3 条全部加 `https://v4.gh-proxy.org/` 前缀：`mmdb`、`asn`、`geosite`（`lib/models/clash_config.dart:GeoXUrl`） | `lib/models/clash_config.dart` | `// [Gamebox] GeoXUrl default URLs` |
 
 ### 1.6 应用标识
 

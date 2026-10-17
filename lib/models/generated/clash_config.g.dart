@@ -399,19 +399,15 @@ Map<String, dynamic> _$ExperimentalToJson(_Experimental instance) =>
     };
 
 _GeoXUrl _$GeoXUrlFromJson(Map<String, dynamic> json) => _GeoXUrl(
-  // [Gamebox] Mirrors of GitHub releases via v4.gh-proxy.org for CN users.
-  // Mirror kept here (not just in @Default on clash_config.dart) because
-  // this is the deserializer that actually seeds new config files when
-  // the user has never saved one. Sync upstream: keep prefix.
   mmdb:
       json['mmdb'] as String? ??
-      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
+      'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
   asn:
       json['asn'] as String? ??
-      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb',
+      'https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb',
   geosite:
       json['geosite'] as String? ??
-      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
+      'https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
 );
 
 Map<String, dynamic> _$GeoXUrlToJson(_GeoXUrl instance) => <String, dynamic>{

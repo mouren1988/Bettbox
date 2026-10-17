@@ -256,44 +256,33 @@ class Request {
 
   Future<Map<String, dynamic>?> checkForUpdate() async {
     try {
-      // [Gamebox] 检查更新请求的 GitHub 仓库。$repository 在
-      // lib/common/constant.dart 定义（mouren1988/Bettbox）。
-      // 同步上游时务必确认这里指向你自己的 fork / Gamebox 专用仓库，
-      // 否则会去查 appshubcc/Bettbox 的 release，永远显示有新版本。
-      final t = DateTime.now().millisecondsSinceEpoch;
-      // [Gamebox] 检查更新 URL 走 gh-proxy 镜像，避免国内直连
-      // raw.githubusercontent.com / github.com 被墙。
-      // URL 模板: https://v4.gh-proxy.org/<原始 URL>
-      // 上游默认 raw.githubusercontent.com/$repository/.../version.json。
-      // Gamebox 仍然走 GitHub releases HTML 页面（不动函数逻辑），
-      // 仅用 gh-proxy 包一层让国内可访问。
+      // [Gamebox] 检查更新走 raw.githubusercontent.com 读 fork 的
+      // gamebox 分支上的 version.json。
+      // 仓库 + URL 在 lib/common/constant.dart 定义（mouren1988/Bettbox）。
+      // Gamebox 不发 GitHub releases（用户不想），改成直接读分支上的 JSON。
+      // 同步上游时务必确认这里指向你自己的 fork，否则会去查
+      // appshubcc/Bettbox 的 release，永远显示有新版本。
+      // version.json 期望字段（用户维护，key 名与上游 release payload 兼容）：
+      //   { "version": "1.19.5+2026100101", "notes": "..." }
+      // 客户端内部把 `version` 映射成 `tag_name`、`notes` 映射成 `body`，
+      // 下游 controller / about 零改动。
       final response = await _dio.get(
-        'https://v4.gh-proxy.org/https://github.com/$repository/releases/latest?t=$t',
-        options: Options(
-          followRedirects: false,
-          validateStatus: (status) =>
-              status != null && status >= 300 && status < 400,
-        ),
+        updateCheckUrl,
+        options: Options(responseType: ResponseType.json),
       );
-      final location = response.headers['location']?.firstOrNull;
-      if (location != null && location.contains('/releases/tag/')) {
-        final remoteVersion = location.split('/').last.trim();
-        if (remoteVersion.isNotEmpty) {
-          final version = globalState.packageInfo.version;
-          final hasUpdate =
-              utils.compareVersions(
-                remoteVersion.replaceAll('v', ''),
-                version,
-              ) >
-              0;
-          if (!hasUpdate) return null;
-          return {
-            'tag_name': remoteVersion,
-            'html_url': 'https://v4.gh-proxy.org/https://github.com/$repository/releases/latest',
-            'body': 'New version available. Please visit GitHub to download.',
-          };
-        }
-      }
+      final data = response.data;
+      if (data is! Map) return null;
+      final remoteVersion = (data['version'] as String?)?.trim();
+      if (remoteVersion == null || remoteVersion.isEmpty) return null;
+      final version = globalState.packageInfo.version;
+      final hasUpdate =
+          utils.compareVersions(remoteVersion.replaceAll('v', ''), version) > 0;
+      if (!hasUpdate) return null;
+      return {
+        'tag_name': remoteVersion,
+        'html_url': downloadUrl,
+        'body': (data['notes'] as String?) ?? 'New version available.',
+      };
     } catch (e) {
       commonPrint.warn('Check update failed: ${e.formatErrorLog}');
     }

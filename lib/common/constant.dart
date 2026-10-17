@@ -47,16 +47,23 @@ const configKey = 'config';
 const customSidebarIconKey = 'custom_sidebar_icon';
 const customDashboardTitleKey = 'custom_dashboard_title';
 const double dialogCommonWidth = 300;
-// [Gamebox] Update-check repository. We wrap the raw GitHub URL in
-// v4.gh-proxy.org so the client can fetch version.json without going
-// through GitHub directly (some CN networks block raw.githubusercontent.com).
+// [Gamebox] Update-check repository.
+// Gamebox does NOT publish GitHub releases (the user does not want to).
+// Instead, a `version.json` is committed on the `gamebox` branch of this
+// fork, and checkForUpdate() reads it directly via raw.githubusercontent.com.
 // Upstream Bettbox default is appshubcc/Bettbox; Gamebox points to
 // mouren1988/Bettbox (the user's fork). Do NOT blindly sync upstream.
 const repository = 'mouren1988/Bettbox';
-// [Gamebox] Full version-check URL with gh-proxy mirror baked in.
+// [Gamebox] Full version-check URL.
+// Path: <repo>/refs/heads/<branch>/version.json  ->  mouren1988/Bettbox/refs/heads/gamebox/version.json
+// The `repository` constant above is interpolated by the URL template.
 // Sync upstream: keep this URL intact even if upstream changes `repository`.
 const updateCheckUrl =
-    'https://v4.gh-proxy.org/https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';
+    'https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';
+// [Gamebox] Download URL shown in the "new version" dialog.
+// User does not publish GitHub releases; new builds go to Lanzou cloud disk.
+// Sync upstream: keep this URL intact even if upstream changes its release URL.
+const downloadUrl = 'https://v10.lanzoup.com/b013a2b1wh';
 const ipInfoToken = String.fromEnvironment('IPINFO_TOKEN', defaultValue: '');
 const defaultExternalController = '127.0.0.1:9090';
 const maxMobileWidth = 600;
