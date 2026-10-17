@@ -3,18 +3,26 @@
 > 本文件记录 Gamebox 相对 upstream Bettbox 的所有定制化修改。
 > 任何修改都要带 `// [Gamebox]` 注释，并同步更新本文件。
 
-**当前 gamebox 分支 HEAD：`0667de06`**（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
-`e586a312` 之后追加的提交：
-1. `69703ac0` — re-apply customizations (UA, 1d update, fast animation, remove outbound-mode, gemini, gh-proxy mirror)
-2. `53c204ab` — wrap GeoXUrl default URLs with v4.gh-proxy.org mirror
-3. `0667de06` — patch generated deserializer + BundleMRS URL with gh-proxy
+**当前 gamebox 分支 HEAD：`d59138b1`**（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
 
-**未提交的工作区改动（建议审核后 commit）**：
-- `lib/models/generated/clash_config.g.dart` — `_GeoXUrlFromJson` 3 条 URL 去掉 gh-proxy 前缀（**回滚到上游**）
-- `lib/views/resources.dart` — BundleMRS.7z URL 去掉 gh-proxy 前缀（**回滚到上游**）
-- `lib/common/constant.dart` — 新增 `downloadUrl` 蓝奏云盘链接；`updateCheckUrl` 改为 `raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json`（**不再走 gh-proxy 也不再走 GitHub releases**）
-- `lib/common/request.dart` — `checkForUpdate()` 重写：直接 GET `updateCheckUrl` 读 JSON，期望字段 `version` / `notes`（内部映射成 `tag_name` / `body` 保持调用方零改动）；`html_url` 固定为 `downloadUrl`
-- `GAMEBOX_CUSTOMIZATIONS.md` — §1.5 同步：删除 GEO 行；新增 downloadUrl + `version.json` schema
+**`d59138b1`（最近推送的 GB/TB 自动切换提交，未推改动见下面 §1.9、§7）**：
+- 上一波提交（按时间倒序）：
+  1. `d59138b1` — traffic 用量显示 GB→TB 自动切换（>=1024 GB 用 TB 单位，避免数字过长）
+  2. `dcbea701` — 用户卡图标 24px + padding 平衡
+  3. `2d7425d2` — 用户卡 title 改用 person_outline（与 IP 卡风格一致）
+  4. `eaa017e5` — 用户卡用面板账号名 + 删除冗余「用户:」行（保持 3 行布局）
+
+**本轮未推送的「即将 commit」改动**（按主题归类，见 §1.9 / §7）：
+
+| 主题 | 文件 | 说明 |
+|---|---|---|
+| i18n 锁 zh_CN | `lib/views/tools.dart` `_LocaleItem` | Radio 列表只显示简体中文一项；老 appSetting.locale 不擦（兼容） |
+| 卡片样式微调 | `lib/widgets/card.dart` `lib/widgets/list.dart` | i18n 锁 zh_CN 同步 |
+| 关于页描述 | `lib/l10n/intl/messages_zh_CN.dart` | desc 缩短为「致力于更好的客户端体验。」；otherContributors 改名 |
+| ARB 同步 | `arb/intl_*.arb`（6 个 locale） | otherContributors 翻译同步；otherContributors 中文去「(随机排序)」 |
+| intl_utils 重生成 | `lib/controller.dart` `lib/models/clash_config.dart` `lib/views/about.dart` `lib/views/dashboard/widgets/widgets.dart` | intl_utils 自动重生成 + [Gamebox] 注释保留 |
+| 安装器去英文 | `windows/packaging/exe/inno_setup.iss` `windows/packaging/exe/make_config.yaml` | 去掉 english locale + english CustomMessages，避免 ISCC 报 Unknown language |
+| 辅助脚本 | `tools/fix_encoding.dart` `tools/write_make_config.dart` | 修复 arb 编码 + 写入 make_config 的工具脚本 |
 
 ---
 
@@ -134,6 +142,23 @@ flutter build windows --release --dart-define=APP_ENV=stable
 | 修改密码入口 | 退出账号时显示 | `lib/views/dashboard/widgets/user_profile.dart` | `// [Gamebox] 退出账号菜单` |
 | 头像 | 本地 `mouren1988.jpg`（不联网） | `lib/views/about.dart` | `// [Gamebox] 头像本地化` |
 
+### 1.9 i18n 锁 zh_CN（设置页只显示简体中文）
+
+| 项 | 说明 | 文件 | 注释 |
+|---|---|---|---|
+| 设置页语言列表 | 只显示「简体中文」一项（`_LocaleItem._localeOptions` 改为 `const [Locale.fromSubtags(...)]`） | `lib/views/tools.dart` | `// [Gamebox] 语言入口只保留简体中文` |
+| 显示映射 | `_nativeLocaleNames` 字典保留 `zh_CN` 老 key + 新增 `zh_Hans_CN` key，都映射到「简体中文」 | `lib/views/tools.dart` | `// [Gamebox] 字典保留原 key 不动` |
+| 当前 locale 显示 | `currentLocale` 强行落到 `_localeOptions` 唯一项（`_LocaleItem.build`），保证 Radio 始终选中简体中文 | `lib/views/tools.dart` | `// [Gamebox] 即使 appSetting.locale 持久化的是老值...` |
+| 持久化兼容 | `appSetting.locale` 如果之前是 en/ja/... 不会被强行擦（防止破坏老用户偏好存储） | `lib/models/config.dart` | 沿用上游存储格式 |
+| `otherContributors` 文案 | 6 个 locale 的 arb 全部去掉「(随机排序)」/「(Random Order)」等尾巴；中文用「贡献者」 | `arb/intl_*.arb` | 关于页只显示维护者，不再有「随机排序」误导 |
+| 关于页 `desc` | 缩短为「Gamebox 基于强大灵活的 Mihomo 内核深度打造，致力于更好的客户端体验。」（去掉「我们的愿景: Connecting Open Source and AI, Accelerating Innovation」英文尾巴） | `lib/l10n/intl/messages_zh_CN.dart` | intl_utils 自动重生成 |
+
+**为什么这么做**：
+- 上游 MaterialApp.locale 写死 zh-Hans-CN（见 §1.1），**选别的 locale 实际不生效**（下次冷启动被覆盖）
+- 但设置页 Radio 列表还显示 7 项（zh_CN/zh_TC/en/ru/fa/ja/ko），**会误导用户以为能切换**
+- 锁成只显示 zh_CN 消除误导
+- 不强行擦 appSetting.locale，**保持存储格式兼容**（老用户升级不会因为 locale 字段缺失出 bug）
+
 ---
 
 ## 2. 关于页特殊处理
@@ -209,3 +234,25 @@ flutter build windows --release --dart-define=APP_ENV=stable
 # 4. 设置 → 关于页是 Gamebox 而不是 Bettbox
 # 5. 8 项定制默认值（深色/中文/UA 等）符合预期
 ```
+
+## 7. Inno Setup 安装器（只保留中文）
+
+| 项 | 说明 | 文件 | 注释 |
+|---|---|---|---|
+| `[Languages]` 段 | 只声明 `chineseSimplified`（去掉 `english` 的 `Name: "english"; MessagesFile: "compiler:Default.isl"`） | `windows/packaging/exe/inno_setup.iss` | `// [Gamebox] 只保留简体中文 CustomMessages` |
+| `[CustomMessages]` 段 | 删掉 hardcoded `english.ShuttingDownRunningApp=...` / `english.RemoveUserDataPrompt=...` 两行 | `windows/packaging/exe/inno_setup.iss` | 原因：没声明 `Name: "english"` 时 ISCC 会报 "Unknown language name "english"" |
+| Liquid 模板 | `[Languages]` 段用 `{% for %}` 直接渲染，**不用 `{% if %}` 包裹 + `{% else %}` 兜底**（Liquid 的 `for` 块不接受 `else`，而 `if` 包裹是给 fallback english 用的，删掉后整段包裹也不需要了） | `windows/packaging/exe/inno_setup.iss` | `// [Gamebox] ...` |
+| `make_config.yaml` `locales` | 只列 zh 一项（删 en） | `windows/packaging/exe/make_config.yaml` | `// [Gamebox] 只保留简体中文：去掉 en，避免安装器弹出 language dialog` |
+| 9 个 verification 警告 | `SourceVerificationFailed` / `StatusDownloadFiles` / `StopExtraction` / `VerificationFileHashIncorrect` / `VerificationFileNameIncorrect` / `VerificationFileSizeIncorrect` / `VerificationFileTagIncorrect` / `VerificationKeyNotFound` / `VerificationSignatureDoesntExist` / `VerificationSignatureInvalid` 在 `ChineseSimplified.isl` 未定义 → 走 Default.isl 英文 fallback | — | 不致命，verification 流程出现时是英文消息（业务消息全中文） |
+
+**为什么这么做**：
+- 上游 Bettbox 默认带 6 个 locale + english Default，安装时 ISCC 自动弹「Select Language」对话框
+- 既然我们只发布中文版（§1.1 固定 locale + §1.9 设置页只显示中文），**language dialog 完全没有意义**（用户语言选什么都被覆盖回 zh-CN）
+- 删 english 后 ISCC 直接进中文安装流程，**节省一个点击**
+
+**rebase / sync 时**：
+- 如果 upstream 重新加回 `english` 到 `[Languages]` 段，**立刻删掉**
+- 如果 upstream 在 `[CustomMessages]` 加了 `english.*` 行，**同步删掉**
+- 同步脚本检查点：`grep -n "english" windows/packaging/exe/inno_setup.iss` 必须只有 ISCC compiler 内置引用（`"compiler:Default.isl"` 那条作为兜底已经删除）
+
+
