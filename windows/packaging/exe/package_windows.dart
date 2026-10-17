@@ -42,8 +42,6 @@ void main(List<String> arguments) async {
   final appVersion = versionMatch.group(1)!;
   print('App Version: $appVersion');
 
-  final outputBaseName = 'Bettbox-$appVersion-windows-$desc-setup';
-
   // 2. Parse make_config.yaml
   final configFile = File('windows/packaging/exe/make_config.yaml');
   if (!configFile.existsSync()) {
@@ -52,6 +50,11 @@ void main(List<String> arguments) async {
   }
   final configContent = configFile.readAsStringSync();
   final makeConfig = loadYaml(configContent) as YamlMap;
+
+  final displayName = makeConfig['display_name'] as String? ?? 'Gamebox';
+  final productName = makeConfig['app_name'] as String? ?? 'Gamebox';
+
+  final outputBaseName = '$displayName-$appVersion-windows-$desc-setup';
 
   // 3. Define directories
   final buildDirName = arch == 'arm64' ? 'arm64' : 'x64';
@@ -63,11 +66,11 @@ void main(List<String> arguments) async {
   }
 
   // 4. Map variables for Inno Setup template
-  final coreExecutableName = isDev ? 'BettboxDevCore.exe' : 'BettboxCore.exe';
-  final helperExecutableName = isDev ? 'BettboxDevHelperService.exe' : 'BettboxHelperService.exe';
-  final helperServiceName = isDev ? 'BettboxDevHelperService' : 'BettboxHelperService';
-  final helperPipeName = isDev ? r'\\.\pipe\BettboxDev.Helper' : r'\\.\pipe\Bettbox.Helper';
-  final taskName = isDev ? 'Bettbox Dev' : 'Bettbox';
+  final coreExecutableName = isDev ? '${productName}DevCore.exe' : '${productName}Core.exe';
+  final helperExecutableName = isDev ? '${productName}DevHelperService.exe' : '${productName}HelperService.exe';
+  final helperServiceName = isDev ? '$productName Dev Helper' : '$productName Helper';
+  final helperPipeName = isDev ? r'\\.\pipe\' + productName + r'Dev.Helper' : r'\\.\pipe\' + productName + r'.Helper';
+  final taskName = isDev ? '$displayName Dev' : displayName;
   
   // Format locales - resolve file paths to absolute to avoid Inno Setup relative path issues
   final packagingDir = path.absolute('windows/packaging/exe');
@@ -87,14 +90,14 @@ void main(List<String> arguments) async {
     'APP_ID': makeConfig['app_id'],
     'APP_NAME': makeConfig['app_name'],
     'APP_VERSION': appVersion,
-    'EXECUTABLE_NAME': makeConfig['executable_name'] ?? 'Bettbox.exe',
-    'DISPLAY_NAME': makeConfig['display_name'] ?? 'Bettbox',
+    'EXECUTABLE_NAME': makeConfig['executable_name'] ?? 'Gamebox.exe',
+    'DISPLAY_NAME': makeConfig['display_name'] ?? 'Gamebox',
     'PUBLISHER_NAME': makeConfig['publisher'] ?? 'appshub.cc',
     'ARCH': arch == 'arm64' ? 'arm64' : 'x64',
-    'PUBLISHER_URL': makeConfig['publisher_url'] ?? 'https://github.com/appshubcc/Bettbox',
+    'PUBLISHER_URL': makeConfig['publisher_url'] ?? 'https://github.com/appshubcc/Gamebox',
     'CREATE_DESKTOP_ICON': true,
     'LAUNCH_AT_STARTUP': true,
-    'INSTALL_DIR_NAME': '{autopf64}\\${makeConfig['display_name'] ?? 'Bettbox'}',
+    'INSTALL_DIR_NAME': '{autopf64}\\$displayName',
     'SOURCE_DIR': sourceDir,
     'OUTPUT_BASE_FILENAME': outputBaseName,
     'LOCALES': locales,
@@ -195,7 +198,7 @@ void main(List<String> arguments) async {
       cleanBatSource.copySync(cleanBatDest.path);
     }
 
-    final portableOutputBaseName = 'Bettbox-$appVersion-windows-$desc-portable.zip';
+    final portableOutputBaseName = '$displayName-$appVersion-windows-$desc-portable.zip';
     final targetPortableZipPath = path.join('dist', portableOutputBaseName);
     final targetPortableFile = File(targetPortableZipPath);
     if (targetPortableFile.existsSync()) {
