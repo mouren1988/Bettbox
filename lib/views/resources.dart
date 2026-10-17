@@ -397,7 +397,8 @@ class _GeoDataListItemState extends ConsumerState<GeoDataListItem> {
                 const SizedBox(height: 4),
                 Text(
                   isBundleMRS
-                      ? 'https://github.com/appshubcc/bett-rules/releases/download/latest/BundleMRS.7z'
+                      // [Gamebox] BundleMRS.7z via gh-proxy mirror.
+                      ? 'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/BundleMRS.7z'
                       : url!,
                   style: context.textTheme.bodyMedium?.toLight,
                 ),
