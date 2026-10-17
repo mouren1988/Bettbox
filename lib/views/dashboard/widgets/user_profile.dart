@@ -102,14 +102,23 @@ class UserProfileCard extends ConsumerWidget {
                     color: color,
                   ),
                   const SizedBox(width: 8),
+                  // [Gamebox] 主标题改用用户名，去掉独立的"用户:"行，
+                  // 这样下面就剩流量/同步/到期三行，与连通性卡对齐。
                   Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.textTheme.titleSmall?.copyWith(
-                        color: color,
-                      ),
+                    child: ValueListenableBuilder<String>(
+                      valueListenable: globalState.panelAccountName,
+                      builder: (_, name, _) {
+                        final display =
+                            (name.trim().isEmpty ? '-' : name.trim());
+                        return Text(
+                          display,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.textTheme.titleSmall?.copyWith(
+                            color: color,
+                          ),
+                        );
+                      },
                     ),
                   ),
                   SizedBox(
@@ -155,17 +164,7 @@ class UserProfileCard extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ValueListenableBuilder<String>(
-                      valueListenable: globalState.panelAccountName,
-                      builder: (_, name, _) {
-                        return _line(
-                          label: '用户',
-                          value: name.trim().isEmpty ? '-' : name.trim(),
-                          labelStyle: labelStyle,
-                          valueStyle: rowStyle,
-                        );
-                      },
-                    ),
+                    // [Gamebox] 用户名已上移到主标题，这里删掉原"用户:"行。
                     _line(
                       label: '流量',
                       value: traffic,
