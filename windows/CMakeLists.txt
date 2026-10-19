@@ -127,6 +127,13 @@ install(FILES
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
+# [Gamebox] 使用说明配图。HTML 里写的是 manual/stepN-xxx.png 相对路径，
+# 所以图片必须装在 ${INSTALL_BUNDLE_LIB_DIR}/manual/ 下，浏览器才能解析。
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../assets/manual/"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/manual"
+  COMPONENT Runtime
+  FILES_MATCHING PATTERN "*.png" PATTERN "*.jpg" PATTERN "*.jpeg" PATTERN "*.webp" PATTERN "*.gif")
+
 if(PLUGIN_BUNDLED_LIBRARIES)
   install(FILES "${PLUGIN_BUNDLED_LIBRARIES}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
