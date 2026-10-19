@@ -1,0 +1,88 @@
+# [Gamebox] 强制 LF 提交 / LF 检出, 解决 Windows 上 "明明没改文件
+#   但 git status 报 M" 的 CRLF / 编码污染问题。
+#
+#   适用背景:
+#   - Gamebox 在 Windows 上开发, PowerShell / VSCode / 旧 Dart SDK
+#     默认 EOL 行为不统一(有的写 CRLF, 有的写 LF)。
+#   - 仓内仍有少量 UTF-16 LE 历史的 .dart 文件(早期 Dart SDK 行为),
+#     git 会把它们当成"被改动"——其实只是字节级编码差异, 无业务改动,
+#     此时直接 `git restore <file>` 丢弃即可, 不要 add。
+#
+#   规则:
+#   - `* text=auto eol=lf`           : 所有文本文件 commit 时转 LF
+#                                      checkout 时也保持 LF(忽略 CRLF)
+#   - `*.png binary` 等              : 明确标记为二进制, 跳过 EOL 处理
+#
+#   验证命令(改完 .gitattributes 后):
+#     git ls-files --eol lib/panel/panel_auth.dart
+#     # 期望: w/lf i/lf (不再是 i/crlf w/lf)
+
+# ── 文本文件统一规则 ─────────────────────────────────────
+*               text=auto eol=lf
+
+# ── 二进制文件明确标记(避免 text=auto 误判) ────────────
+#   图片
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.webp          binary
+*.icns          binary
+*.bmp           binary
+
+#   字体
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.otf           binary
+*.eot           binary
+
+#   音视频
+*.mp4           binary
+*.webm          binary
+*.mov           binary
+*.avi           binary
+*.mkv           binary
+*.mp3           binary
+*.wav           binary
+*.ogg           binary
+*.flac          binary
+
+#   压缩包
+*.zip           binary
+*.gz            binary
+*.bz2           binary
+*.xz            binary
+*.7z            binary
+*.rar           binary
+*.tar           binary
+
+#   文档
+*.pdf           binary
+
+#   Windows 可执行 / 调试
+*.exe           binary
+*.dll           binary
+*.pdb           binary
+*.lib           binary
+*.exp           binary
+
+#   Unix / macOS
+*.so            binary
+*.dylib         binary
+*.a             binary
+*.o             binary
+*.obj           binary
+
+#   移动端
+*.apk           binary
+*.aab           binary
+*.ipa           binary
+
+#   锁文件(Pubspec.lock 等由 pub 自动生成, 不应被 EOL 改写)
+*.lock          binary
+
+#   CMake / Ninja / Visual Studio 中间产物
+*.cmake         binary
+CMakeCache.txt  binary
