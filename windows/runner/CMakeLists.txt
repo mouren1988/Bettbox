@@ -30,9 +30,9 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MINOR=${FLUTT
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_PATCH=${FLUTTER_VERSION_PATCH}")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTTER_VERSION_BUILD}")
 target_compile_definitions(${BINARY_NAME} PRIVATE "$<$<CONFIG:Debug>:BETTBOX_DEV>")
-if("$ENV{BETTBOX_COMPATIBLE_BUILD}" STREQUAL "1")
-  target_compile_definitions(${BINARY_NAME} PRIVATE "BETTBOX_COMPATIBLE_BUILD")
-endif()
+# [Gamebox] 对齐 upstream v1.19.6:移除 BETTBOX_COMPATIBLE_BUILD 兼容构建开关
+# (原 `if("$ENV{BETTBOX_COMPATIBLE_BUILD}" STREQUAL "1")` 块被 upstream 删除)。
+# 配合 main.cpp 的无条件禁 Impeller,本项目不再需要兼容构建分支。
 
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
