@@ -114,6 +114,13 @@ class _WindowContainerState extends ConsumerState<WindowManager>
   @override
   void onWindowClose() async {
     globalState.appController.unBackBlock();
+    // [Gamebox] 登录窗状态下点 X 走 handleExit 彻底退出，行为和托盘退出对齐：
+    // 销毁托盘 → 停代理 → clashCore.shutdown() → clashService.destroy() → system.exit()。
+    // 已登录主界面下仍走 handleBackOrExit（隐藏窗口，不退出进程）。
+    if (!globalState.panelUnlocked.value) {
+      await globalState.appController.handleExit();
+      return;
+    }
     await globalState.appController.handleBackOrExit();
   }
 

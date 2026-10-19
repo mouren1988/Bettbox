@@ -117,7 +117,10 @@ class _LoginWindowButtonsState extends State<_LoginWindowButtons> {
           icon: Icons.close,
           onPressed: () {
             globalState.appController.unBackBlock();
-            globalState.appController.handleBackOrExit();
+            // [Gamebox] 登录窗状态下点 X 彻底退出，和托盘退出走同一条 handleExit 路径，
+            // 避免"窗口已隐藏但 gamebox 进程 + clash 内核仍残留"（登录窗被 hideUntilLogin
+            // 销毁了托盘图标，进程残留用户看不到、也点不到）。
+            globalState.appController.handleExit();
           },
         ),
       ],
