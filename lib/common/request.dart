@@ -266,17 +266,56 @@ class Request {
       //   { "version": "1.19.5+2026100101", "notes": "..." }
       // 客户端内部把 `version` 映射成 `tag_name`、`notes` 映射成 `body`，
       // 下游 controller / about 零改动。
+      commonPrint.debug('[UPDATE] updateCheckUrl: $updateCheckUrl');
+      print('[UPDATE] updateCheckUrl: $updateCheckUrl');
       final response = await _dio.get(
         updateCheckUrl,
-        options: Options(responseType: ResponseType.json),
+        options: Options(responseType: ResponseType.bytes),
       );
-      final data = response.data;
-      if (data is! Map) return null;
+      commonPrint.debug('[UPDATE] statusCode: ${response.statusCode}');
+      print('[UPDATE] statusCode: ${response.statusCode}');
+      final rawBytes = response.data;
+      if (rawBytes is! Uint8List) {
+        commonPrint.debug('[UPDATE] FAIL: data is not Uint8List (${rawBytes.runtimeType})');
+        print('[UPDATE] FAIL: data is not Uint8List (${rawBytes.runtimeType})');
+        return null;
+      }
+      final decompressed = _decompressIfNeeded(rawBytes, response.headers);
+      Object? parsed;
+      try {
+        parsed = jsonDecode(utf8.decode(decompressed));
+      } catch (e) {
+        commonPrint.debug('[UPDATE] FAIL: jsonDecode error: $e');
+        print('[UPDATE] FAIL: jsonDecode error: $e');
+        return null;
+      }
+      final data = parsed;
+      commonPrint.debug('[UPDATE] response.data.runtimeType: ${data.runtimeType}');
+      print('[UPDATE] response.data.runtimeType: ${data.runtimeType}');
+      commonPrint.debug('[UPDATE] response.data: $data');
+      print('[UPDATE] response.data: $data');
+      if (data is! Map) {
+        commonPrint.debug('[UPDATE] FAIL: data is not Map');
+        print('[UPDATE] FAIL: data is not Map');
+        return null;
+      }
       final remoteVersion = (data['version'] as String?)?.trim();
-      if (remoteVersion == null || remoteVersion.isEmpty) return null;
-      final version = globalState.packageInfo.version;
-      final hasUpdate =
-          utils.compareVersions(remoteVersion.replaceAll('v', ''), version) > 0;
+      commonPrint.debug('[UPDATE] remoteVersion: "$remoteVersion"');
+      print('[UPDATE] remoteVersion: "$remoteVersion"');
+      final localVersion = globalState.packageInfo.version;
+      commonPrint.debug('[UPDATE] localVersion: "$localVersion"');
+      print('[UPDATE] localVersion: "$localVersion"');
+      if (remoteVersion == null || remoteVersion.isEmpty) {
+        commonPrint.debug('[UPDATE] FAIL: remoteVersion null or empty');
+        print('[UPDATE] FAIL: remoteVersion null or empty');
+        return null;
+      }
+      final compared = utils.compareVersions(remoteVersion.replaceAll('v', ''), localVersion);
+      commonPrint.debug('[UPDATE] compareVersions result: $compared (positive = has update)');
+      print('[UPDATE] compareVersions result: $compared (positive = has update)');
+      final hasUpdate = compared > 0;
+      commonPrint.debug('[UPDATE] hasUpdate: $hasUpdate');
+      print('[UPDATE] hasUpdate: $hasUpdate');
       if (!hasUpdate) return null;
       return {
         'tag_name': remoteVersion,
@@ -284,6 +323,7 @@ class Request {
         'body': (data['notes'] as String?) ?? 'New version available.',
       };
     } catch (e) {
+      commonPrint.debug('[UPDATE] FAIL exception: $e');
       commonPrint.warn('Check update failed: ${e.formatErrorLog}');
     }
     return null;

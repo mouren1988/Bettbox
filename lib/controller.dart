@@ -1216,42 +1216,39 @@ final forceCheck =
       final body = data['body'];
       final submits = utils.parseReleaseBody(body);
       final textTheme = context.textTheme;
+      // [Gamebox] 大字直接显示 notes 内容 (body)。原版渲染 $tagName
+      // 会把 '1.19.7+2026101701' 完整版本号暴露在标题上，没意义。
+      // notes 由仓库作者维护，是真正的发布说明，比主版本号更有用。
+      // 如果 notes 为空则回退到 tagName 保证弹窗不为空。
+      final versionDisplay = (body != null && body.trim().isNotEmpty)
+          ? body.trim()
+          : (tagName ?? '');
       final res = await globalState.showMessage(
         title: appLocalizations.discoverNewVersion,
         message: TextSpan(
-          text: '$tagName \n',
+          text: '$versionDisplay\n',
           style: textTheme.headlineSmall,
-          children: [
-            TextSpan(text: '\n', style: textTheme.bodyMedium),
-            for (final submit in submits)
-              TextSpan(text: '- $submit \n', style: textTheme.bodyMedium),
-          ],
         ),
         confirmText: appLocalizations.goDownload,
       );
       if (res != true) {
         return;
       }
-      const String assetSuffix = String.fromEnvironment('APP_ASSET_SUFFIX');
-      // [Gamebox] 检查更新跳转。$repository 来自 lib/common/constant.dart，
-      // 当前指向 mouren1988/Bettbox（你的 fork）。同步上游时核对：
-      // 1) 改成你自己的 GitHub 仓库（fork 或 Gamebox 专用仓库）；
-      // 2) 不要无脑恢复成 appshubcc/Bettbox，那查的是上游版本号，跟你 Gamebox 没关系。
-      String downloadUrl = 'https://github.com/$repository/releases/latest';
+      // [Gamebox] 检查更新跳转。
+      // 1) 优先用 checkForUpdate() 返回的 html_url（request.dart 里被设成
+      //    lib/common/constant.dart 的 downloadUrl 常量，即蓝奏云网盘）。
+      // 2) 兜底回退到同一个 downloadUrl 常量。
+      // 3) 旧代码是硬编码 'https://github.com/$repository/releases/latest'，
+      //    Gamebox 不发 GitHub release，原配置会跳错地方，已替换。
+      final htmlUrlFromUpdate = (data['html_url'] as String?)?.trim();
+      final String pickedDownloadUrl = (htmlUrlFromUpdate != null && htmlUrlFromUpdate.isNotEmpty)
+          ? htmlUrlFromUpdate
+          : downloadUrl;
 
-      if (assetSuffix.isNotEmpty) {
-        final versionWithoutV = tagName.startsWith('v')
-            ? tagName.substring(1)
-            : tagName;
-        var finalSuffix = assetSuffix;
-        if (appPath.isPortable && system.isWindows) {
-          finalSuffix = 'windows-amd64-compatible-portable.zip';
-        }
-        downloadUrl =
-            'https://github.com/$repository/releases/download/$tagName/Gamebox-$versionWithoutV-$finalSuffix';
-      }
-
-      globalState.openUrl(downloadUrl);
+      // [Gamebox] 跳转统一走 pickedDownloadUrl (蓝奏云网盘)。
+      // Gamebox 不发 GitHub release,删掉旧逻辑里硬编码的
+      // 'github.com/$repository/releases/...' 兜底避免误跳。
+      globalState.openUrl(pickedDownloadUrl);
     } else if (handleError) {
       globalState.showMessage(
         title: appLocalizations.checkUpdate,
