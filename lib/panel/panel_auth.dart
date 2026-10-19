@@ -652,15 +652,28 @@ Future<void> _importSubscription(_PanelSession session) async {
   final label = (panelName == null || panelName.trim().isEmpty)
       ? null
       : panelName.trim();
-  var created = Profile.normal(
-    url: panelSubscribeRelayUrl(token),
+  final url = panelSubscribeRelayUrl(token);
+  // [Gamebox] 按 url sha256 当 id；先查本地同 id 的 profile，
+  // 复用旧的 selectedMap，避免「重登后节点丢失」（见 customizations 文档）。
+  final id = sha256.convert(utf8.encode(url)).toString().substring(0, 16);
+  final existing = globalState.config.profiles.getProfile(id);
+  var created = Profile(
+    id: id,
+    url: url,
     label: label,
+    autoUpdateDuration: defaultUpdateDuration,
+    selectedMap: existing?.selectedMap ?? const {},
+    unfoldSet: existing?.unfoldSet ?? const {},
   ).copyWith(
     subscriptionInfo: SubscriptionInfo.formHString(fetched.userinfo),
   );
   // [Gamebox] 第一次登录时内核还没 init，跳过校验。载入仍走原版 applyProfile。
   created = await created.saveFile(fetched.bytes, validate: false);
   await globalState.appController.addProfile(created);
+  // [Gamebox] 显式切到刚拉的 profile：删除「退出账号→删 deleteAllProfiles」
+  // 后 currentProfileId 不再被清空，靠 addProfile 的「currentProfileId==null 才设」
+  // 兜不住「换账号」场景。
+  globalState.appController.setCurrentProfileId(created.id);
 }
 
 // 返回错误文案；成功返回 null。
@@ -681,7 +694,9 @@ Future<String?> loginPanelAccount({
       remember: remember,
       autoLogin: autoLogin,
     );
-    await globalState.appController.deleteAllProfiles();
+    // [Gamebox] 删 deleteAllProfiles：保留旧 profile/selectedMap，重登/换账号不丢节点。
+    // 老逻辑：删所有 profile → 拉新订阅 → selectedMap 被空集合覆盖。
+    // 新逻辑：_importSubscription 内按 url hash upsert，保留旧 selectedMap。
     try {
       await _importSubscription(session);
     } catch (e) {
@@ -755,7 +770,9 @@ Future<void> logoutPanelAccount() async {
       await globalState.appController.updateStatus(false);
     }
   } catch (_) {}
-  await globalState.appController.deleteAllProfiles();
+  // [Gamebox] 删 deleteAllProfiles：跟托盘退出统一逻辑，只清 session，不删本地 profile/selectedMap。
+  // 旧行为：删所有 yaml 文件 + 清空 profiles 数组 + 清 currentProfileId。
+  // 新行为：保留本地订阅（节点、规则集、selectedMap 都在），下次登录按 url hash upsert 复用。
   await _clearSession();
   final nav = globalState.navigatorKey.currentState;
   nav?.popUntil((route) => route.isFirst);
@@ -779,9 +796,8 @@ Future<void> clearPanelDataOnExit() async {
       await _serverLogout(session.authData);
     } catch (_) {}
   }
-  try {
-    await globalState.appController.deleteAllProfiles(throughCore: false);
-  } catch (_) {}
+  // [Gamebox] 删 deleteAllProfiles：进程级退出也保留本地 profile/selectedMap。
+  // 跟「退出账号」「托盘退出」统一逻辑，session 留给下次登录复用。
   await _clearSession();
 }
 

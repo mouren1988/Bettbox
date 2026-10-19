@@ -564,6 +564,12 @@ class AppController {
     _ref.read(profilesProvider.notifier).value = profiles;
   }
 
+  // [Gamebox] 显式切到指定 profile（面板登录/切账号时用）。
+  // 原 addProfile 只在 currentProfileId==null 时才设，切账号时不会更新。
+  void setCurrentProfileId(String? id) {
+    _ref.read(currentProfileIdProvider.notifier).value = id;
+  }
+
   void addLog(Log log) {
     _pendingLogs.add(log);
     throttler.call(

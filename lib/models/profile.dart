@@ -8,6 +8,7 @@ import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
 import 'package:bett_box/models/core.dart';
 import 'package:bett_box/state.dart';
+import 'package:crypto/crypto.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'clash_config.dart';
@@ -99,10 +100,16 @@ abstract class Profile with _$Profile {
     String url = '',
     String? ageSecretKey,
   }) {
+    // [Gamebox] URL 类订阅用 url sha256 前 16 位当 id：同 url 永远同 id，
+    // upsert 时复用同一个 yaml 文件，节点/规则集更新不丢 selectedMap。
+    // 文件导入（url 为空）保留时间戳。
+    final id = url.isEmpty
+        ? DateTime.now().millisecondsSinceEpoch.toString()
+        : sha256.convert(utf8.encode(url)).toString().substring(0, 16);
     return Profile(
       label: label,
       url: url,
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: id,
       autoUpdateDuration: defaultUpdateDuration,
       ageSecretKey: ageSecretKey,
     );
