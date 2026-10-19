@@ -270,7 +270,10 @@ class Request {
       print('[UPDATE] updateCheckUrl: $updateCheckUrl');
       final response = await _dio.get(
         updateCheckUrl,
-        options: Options(responseType: ResponseType.bytes),
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'},
+        ),
       );
       commonPrint.debug('[UPDATE] statusCode: ${response.statusCode}');
       print('[UPDATE] statusCode: ${response.statusCode}');
@@ -302,7 +305,14 @@ class Request {
       final remoteVersion = (data['version'] as String?)?.trim();
       commonPrint.debug('[UPDATE] remoteVersion: "$remoteVersion"');
       print('[UPDATE] remoteVersion: "$remoteVersion"');
-      final localVersion = globalState.packageInfo.version;
+      // [Gamebox] compareVersions 要求两侧都带 +build 号（上游逻辑）。
+      // package_info_plus 在 Windows 平台的 packageInfo.version 不含 build 号
+      // （例：只返回 "1.19.6"，build 号单独放在 packageInfo.buildNumber），
+      // 如果不拼接会被 utils.compareVersions 当 build=0 比较，远端带 build
+      // 时一定返回正数 → 误报更新。手动拼成 "1.19.6+2026101601" 对齐远端格式。
+      final localVersion = globalState.packageInfo.buildNumber.isNotEmpty
+          ? '${globalState.packageInfo.version}+${globalState.packageInfo.buildNumber}'
+          : globalState.packageInfo.version;
       commonPrint.debug('[UPDATE] localVersion: "$localVersion"');
       print('[UPDATE] localVersion: "$localVersion"');
       if (remoteVersion == null || remoteVersion.isEmpty) {
@@ -316,7 +326,11 @@ class Request {
       final hasUpdate = compared > 0;
       commonPrint.debug('[UPDATE] hasUpdate: $hasUpdate');
       print('[UPDATE] hasUpdate: $hasUpdate');
-      if (!hasUpdate) return null;
+      if (!hasUpdate) {
+        commonPrint.debug('[UPDATE] SKIP: versions match (remote=$remoteVersion, local=$localVersion)');
+        print('[UPDATE] SKIP: versions match (remote=$remoteVersion, local=$localVersion)');
+        return null;
+      }
       return {
         'tag_name': remoteVersion,
         'html_url': downloadUrl,
