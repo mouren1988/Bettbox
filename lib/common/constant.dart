@@ -56,10 +56,11 @@ const double dialogCommonWidth = 300;
 const repository = 'mouren1988/Bettbox';
 // [Gamebox] Full version-check URL.
 // Path: <repo>/refs/heads/<branch>/version.json  ->  mouren1988/Bettbox/refs/heads/gamebox/version.json
-// The `repository` constant above is interpolated by the URL template.
+// v1.20.0 起 URL 加 v4.gh-proxy.org 前缀（直连 raw.githubusercontent.com 在 CN 网络不稳）。
+// 用户可在 UI 的「资源」页编辑 URL 时去掉前缀回到直连。
 // Sync upstream: keep this URL intact even if upstream changes `repository`.
 const updateCheckUrl =
-    'https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';
+    'https://v4.gh-proxy.org/https://raw.githubusercontent.com/$repository/refs/heads/gamebox/version.json';
 // [Gamebox] Download URL shown in the "new version" dialog.
 // User does not publish GitHub releases; new builds go to Lanzou cloud disk.
 // Sync upstream: keep this URL intact even if upstream changes its release URL.

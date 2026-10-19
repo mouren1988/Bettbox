@@ -505,24 +505,22 @@ abstract class Experimental with _$Experimental {
 }
 
 // [Gamebox] GeoXUrl default URLs.
-// Upstream points straight to github.com releases, which is unreliable
-// on CN networks. Gamebox wraps each URL with v4.gh-proxy.org so the
-// Flutter HttpClient (used by the GEO updater) hits a CN mirror first
-// and only falls through to GitHub if the mirror fails.
-// Sync upstream: keep the gh-proxy prefix on the 3 URLs.
+// v1.20.0 起 Gamebox 与上游一致（直连 GitHub releases），去掉 v4.gh-proxy.org 前缀。
+// Gamebox 的 gh-proxy 镜像由用户自己添加（在 UI 的「资源」页编辑 URL）。
+// 同步上游：保留与上游相同的 3 条 GitHub URL。
 @freezed
 abstract class GeoXUrl with _$GeoXUrl {
   const factory GeoXUrl({
     @Default(
-      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
+      'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
     )
     String mmdb,
     @Default(
-      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb',
+      'https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb',
     )
     String asn,
     @Default(
-      'https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
+      'https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
     )
     String geosite,
   }) = _GeoXUrl;
@@ -743,8 +741,9 @@ abstract class ClashConfig with _$ClashConfig {
     List<String> skipAuthPrefixes,
     @Default(LogLevel.error) @JsonKey(name: 'log-level') LogLevel logLevel,
     @Default(false) bool ipv6,
-    // [Gamebox] 查找进程默认开启。上游默认 off（unknownEnumValue 仍兜底 always）。
-    @Default(FindProcessMode.always)
+    // [Gamebox] 查找进程默认关闭。v1.20.0 起 Gamebox 与上游一致（off）。
+    // 同步上游：保留 off。
+    @Default(FindProcessMode.off)
     @JsonKey(
       name: 'find-process-mode',
       unknownEnumValue: FindProcessMode.always,
