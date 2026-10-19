@@ -31,12 +31,17 @@ class Navigation {
             ? [NavigationItemMode.mobile, NavigationItemMode.desktop]
             : [],
       ),
-      NavigationItem(
-        icon: const Icon(Icons.folder_shared),
-        label: PageLabel.profiles,
-        builder: (_) =>
-            ProfilesView(key: const GlobalObjectKey(PageLabel.profiles)),
-      ),
+      // [Gamebox] 隐藏订阅入口（防止用户误操作配置文件）：
+      // - 侧边栏、悬浮面板、设置搜索项都通过 Navigation.getItems() 派生,
+      //   这里注释掉就一并消失。
+      // - 业务路径（心跳静默同步、24h 定时器、登录导入）不依赖 UI 入口,
+      //   仍可正常工作。
+      // NavigationItem(
+      //   icon: const Icon(Icons.folder_shared),
+      //   label: PageLabel.profiles,
+      //   builder: (_) =>
+      //       ProfilesView(key: const GlobalObjectKey(PageLabel.profiles)),
+      // ),
       NavigationItem(
         icon: Icon(Icons.view_timeline_rounded),
         label: PageLabel.requests,

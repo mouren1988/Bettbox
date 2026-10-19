@@ -827,6 +827,22 @@ class AppController {
     }
   }
 
+  // [Gamebox] profile_revision 心跳静默同步：绕过 _isProfileUpdateNeeded
+  // 的 1 天节流,直接拉所有 url 类 profile 的最新内容。
+  // 由 panel_auth.dart 心跳发现 panel 抬了 profile_revision 时调用。
+  Future<void> syncProfilesFromPanelRevision() async {
+    for (final profile in _ref.read(profilesProvider)) {
+      if (profile.type == ProfileType.file) continue;
+      try {
+        await updateProfile(profile, validate: false, applyUnchanged: false);
+      } catch (e) {
+        commonPrint.error(
+          '[ProfileRevision] Failed to update ${profile.label ?? profile.id}: ${e.formatErrorLog}',
+        );
+      }
+    }
+  }
+
   Future<void> checkAndUpdateMissedProfiles() async {
     final profilesToUpdate = <Profile>[];
     for (final profile in _ref.read(profilesProvider)) {

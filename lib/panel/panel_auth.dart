@@ -42,11 +42,16 @@ class _PanelSession {
     required this.authData,
     required this.subscribeToken,
     required this.username,
+    // [Gamebox] profile_revision 心跳静默同步：
+    // 上次心跳看到的远端 profile_revision 数字。
+    // null 表示「还没落过基线」（首次心跳时只记录，不触发拉取）。
+    this.lastSeenProfileRevision,
   });
 
   final String authData;
   final String subscribeToken;
   final String username;
+  final int? lastSeenProfileRevision;
 }
 
 String _trimBase(String raw) {
@@ -342,6 +347,9 @@ Future<_PanelSession> _loginLegacy(String identifier, String password) async {
     authData: accessToken,
     subscribeToken: subToken,
     username: identifier,
+    // [Gamebox] 旧版登录阶段已经走 /v1/me,顺手把 profile_revision
+    // 落成基线,避免首次心跳把「登录时刻的数字」误判为「需要更新」。
+    lastSeenProfileRevision: _extractProfileRevision(meParsed),
   );
 }
 
@@ -386,6 +394,8 @@ Future<_PanelSession> _login(String identifier, String password) async {
       authData: tokens.authData,
       subscribeToken: tokens.subscribeToken,
       username: id,
+      // [Gamebox] passport 登录阶段不再多走一次 /v1/me,profile_revision
+      // 留 null,首次心跳探测时落基线。
     );
   }
   // [Gamebox] 与 iGame（invalid_credentials / login_failed）一致的可读中文。
@@ -421,6 +431,10 @@ Future<void> _saveSession(_PanelSession session) async {
     'authData': session.authData,
     'subscribeToken': session.subscribeToken,
     'username': session.username,
+    // [Gamebox] profile_revision 基线；null 时不写入,旧版本读到
+    // 没这个字段的 json 也能正常解析（不破坏向前兼容）。
+    if (session.lastSeenProfileRevision != null)
+      'lastSeenProfileRevision': session.lastSeenProfileRevision,
   });
   globalState.panelAccountName.value = session.username;
 }
@@ -438,11 +452,49 @@ Future<_PanelSession?> _loadSession() async {
       subscribeToken.isEmpty) {
     return null;
   }
+  // [Gamebox] 解析 profile_revision（int / double / 数字字符串都接受,
+  // 与 iGame-for-Windows 行为一致；解析失败当作 null,首次心跳落基线）。
+  int? rev;
+  final r = data['lastSeenProfileRevision'];
+  if (r is int) {
+    rev = r;
+  } else if (r is double && r.isFinite) {
+    rev = r.toInt();
+  } else if (r is String) {
+    rev = int.tryParse(r);
+  }
   return _PanelSession(
     authData: authData,
     subscribeToken: subscribeToken,
     username: username,
+    lastSeenProfileRevision: rev,
   );
+}
+
+// [Gamebox] 仅刷新 lastSeenProfileRevision,其它字段保持不变。
+Future<void> _saveLastSeenProfileRevision(int rev) async {
+  final s = await _loadSession();
+  if (s == null) return;
+  if (s.lastSeenProfileRevision == rev) return;
+  await _saveSession(_PanelSession(
+    authData: s.authData,
+    subscribeToken: s.subscribeToken,
+    username: s.username,
+    lastSeenProfileRevision: rev,
+  ));
+}
+
+// [Gamebox] 从 /v1/me 响应体里抽出 user.profile_revision。
+// 接受 int / double / 数字字符串,与 iGame-for-Windows 保持一致。
+int? _extractProfileRevision(Object? meParsed) {
+  if (meParsed is! Map) return null;
+  final user = meParsed['user'];
+  if (user is! Map) return null;
+  final r = user['profile_revision'];
+  if (r is int) return r;
+  if (r is double && r.isFinite) return r.toInt();
+  if (r is String) return int.tryParse(r);
+  return null;
 }
 
 Future<void> _clearSession() async {
@@ -821,11 +873,15 @@ class _PanelMeProbe {
     required this.ok,
     required this.unauthorized,
     this.unauthorizedError,
+    // [Gamebox] /v1/me 响应体里解析出的 user.profile_revision。
+    // 解析失败或响应不是 2xx 时为 null,心跳处据此决定是否触发静默更新。
+    this.remoteProfileRevision,
   });
 
   final bool ok;
   final bool unauthorized;
   final String? unauthorizedError;
+  final int? remoteProfileRevision;
 }
 
 DateTime? _lastForcedReloginAt;
@@ -855,7 +911,18 @@ Future<_PanelMeProbe> _probePanelMe(_PanelSession session) async {
   if (res.status < 200 || res.status >= 300) {
     return const _PanelMeProbe(ok: false, unauthorized: false);
   }
-  return const _PanelMeProbe(ok: true, unauthorized: false);
+  // [Gamebox] 解析响应体里的 user.profile_revision；解析失败当 null,
+  // 心跳处会因此跳过本次同步（不会触发错误的拉取）。
+  int? rev;
+  try {
+    final parsed = jsonDecode(res.text);
+    rev = _extractProfileRevision(parsed);
+  } catch (_) {}
+  return _PanelMeProbe(
+    ok: true,
+    unauthorized: false,
+    remoteProfileRevision: rev,
+  );
 }
 
 // [Gamebox] 被踢/会话失效：回登录窗，不停代理、不删订阅（对齐 iGame 软重登）。
@@ -925,4 +992,30 @@ Future<void> tickPanelSessionHeartbeat() async {
     return;
   }
   _heartbeatUnauthorizedStreak = 0;
+
+  // [Gamebox] 管理端抬 profile_revision 后,心跳静默同步订阅。
+  // - remote == null:响应没拿到 revision,跳过（不要乱拉）
+  // - local == null :还没落过基线,本次只记录,不触发拉取
+  // - remote > local :面板侧有更新,调 syncProfilesFromPanelRevision()。
+  //                    **注意不走 autoUpdateProfiles** —— 那个会经过
+  //                    _isProfileUpdateNeeded 的 1 天节流(刚拉的 profile
+  //                    要等 1 天才被「允许」再拉,实际体验是 24h 后才生效)。
+  //                    拉取成功与否都把 lastSeen 抬到 remote,避免同版本号反复触发。
+  // 与 iGame-for-Windows src/hooks/use-panel-session-heartbeat.ts 行为一致。
+  final remote = probe.remoteProfileRevision;
+  if (remote == null) return;
+  final local = session.lastSeenProfileRevision;
+  if (local == null) {
+    await _saveLastSeenProfileRevision(remote);
+    return;
+  }
+  if (remote > local) {
+    try {
+      await globalState.appController.syncProfilesFromPanelRevision();
+    } catch (e) {
+      commonPrint.error('[ProfileRevision] syncProfilesFromPanelRevision 失败: $e');
+    } finally {
+      await _saveLastSeenProfileRevision(remote);
+    }
+  }
 }
