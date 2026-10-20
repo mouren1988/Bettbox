@@ -792,16 +792,18 @@ abstract class ClashConfig with _$ClashConfig {
 
   factory ClashConfig.safeFormJson(Map<String, Object?>? json) {
     if (json == null) {
-      return system.isAndroid
-          ? const ClashConfig(findProcessMode: FindProcessMode.always)
-          : defaultClashConfig;
+      // [Gamebox] Android 的兜底分支与 @Default 保持一致 (off)，
+      // 避免「patchClashConfig 字段缺失/解析失败 → Android 强开 always」。
+      // 与上游 defaultClashConfig 行为一致。同步时如果上游给 Android
+      // 改成 always，记得把这条分支也同步更新。
+      return defaultClashConfig;
     }
     try {
       return ClashConfig.fromJson(json);
     } catch (_) {
-      return system.isAndroid
-          ? const ClashConfig(findProcessMode: FindProcessMode.always)
-          : defaultClashConfig;
+      // [Gamebox] 同上：解析失败兜底也用 defaultClashConfig，不再单独
+      // 给 Android 写 always（与 @Default off 不一致是个隐藏 bug）。
+      return defaultClashConfig;
     }
   }
 }

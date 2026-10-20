@@ -36,6 +36,7 @@
   - [3.15 检查更新修复（2026-10-20）](#315-检查更新修复2026-10-20)
   - [3.16 托盘退出通知面板下线（修在线设备不立即归零）](#316-托盘退出通知面板下线修在线设备不立即归零)
   - [3.17 显示文字全部从 Bettbox 改为 Gamebox + 删启动 splash + 登录页居中（2026-10-20）](#317-显示文字全部从-bettbox-改为-gamebox--删启动-splash--登录页居中2026-10-20)
+  - [3.18 安卓端首页默认卡片布局（补回 userProfile + 重排）](#318-安卓端首页默认卡片布局补回-userprofile--重排)
 - [5. 资源文件](#5-资源文件)
 - [6. 注释规范](#6-注释规范)
 - [7. 提交规范](#7-提交规范)
@@ -716,6 +717,139 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 - upstream 如果调整 `PanelLoginGate` 布局,**不要再把 `_LoginWindowButtons` 拿回来**（用户已表态移除）
 - upstream 如果启用 Android splash icon,**留空 `windowSplashScreenAnimatedIcon`** 或重新画图标,不要复用 `splash_text_light.xml`（上游也是把这 path 当字母 "Bettbox" 用的）
 - upstream 如果改 strings.xml 的 `bett_box` key 名,新版顺手把 value 也对齐 "Gamebox"
+
+---
+
+### 3.18 安卓端首页默认卡片布局（补回 userProfile + 重排）
+
+| 列 | 行号 | 改前（左图错版） | 改后（右图确认版） |
+|---|---|---|---|
+| 1 | 第 1 行（整行） | userProfile 放第 1 位（4 列宽，右侧空 4 列） | **networkSpeed** 放第 1 位（8 列宽，整行） |
+| 2 | 第 2 行 | networkSpeed + trafficUsage | **trafficUsage + userProfile** |
+| 3 | 第 3 行 | networkDetection + connectionsCount | **memoryInfo + networkDetection** |
+| 4 | 第 4 行 | memoryInfo（孤立） | **connectionsCount + startButton** |
+| 5 | 第 5 行 | startButton（孤立） | （没有空行） |
+
+3.18 期间出过两版错的，**最终版**是右图（你手动编辑的版本）：
+
+```dart
+const defaultAndroidDashboardWidgets = [
+  networkSpeed,    // 8 列宽 → 第 1 行独占（最宽的卡片在最顶上）
+  trafficUsage,    // ┐
+  userProfile,     // ┘ 第 2 行 并排
+  memoryInfo,      // ┐
+  networkDetection,// ┘ 第 3 行 并排
+  connectionsCount,// ┐
+  startButton,     // ┘ 第 4 行 并排
+];
+```
+
+**为什么要重排（这次为啥左图错了）**：
+
+mobile view 固定 8 列。`crossAxisCellCount: 8` 的卡片=整行独占，`crossAxisCellCount: 4`=半宽并排。在 8 列布局里：
+
+- 把 `networkSpeed`（8 列）放第 1 位 → 它自己占满首行，下方正好是两两并排
+- 把 `userProfile`（4 列）放第 1 位 → 它只占半行，右侧空 4 列，下一张也只占 4 列 → 整个页面"塌掉"，每行要么有空白要么被竖劈
+
+所以「网络速度永远该在最顶」，这是这个 8 列布局的天然最优解。
+
+**代码位置**：
+
+- `lib/models/config.dart` — `defaultAndroidDashboardWidgets` 最终版
+- `lib/models/config.dart` — `legacyAndroidDefaultDashboardWidgets`（3.18 之前漏 userProfile 的版本，作迁移比对用）
+- `lib/models/config.dart` — `misplacedV3_18DashboardWidgets`（**新增** — 3.18 第一次发版的错版，作迁移比对用，过几个版本后可删）
+- `lib/models/config.dart` — `_isLegacyAndroidDefaultDashboard()` + `_isMisplacedV3_18Dashboard()`（双迁移分支）
+- `lib/models/config.dart` — 顺手修掉 `defaultDashboardWidgets` 注释里的一个乱码字符
+
+**为什么需要迁移逻辑（不只是改默认值）**：
+
+`AppSettingProps.safeFromJson` 的 `@Default` **只在 JSON 里完全没有该字段时**生效。已安装用户的 `config.json` 里 `mobileDashboardWidgets` 已经有值（就是旧默认那 6 项），所以**光改 `defaultAndroidDashboardWidgets` 对老用户无效**，他们的首页还是旧排版。
+
+因此加了一条迁移：仅当 `system.isAndroid` 且读回来的 `mobileDashboardWidgets` **等于**以下任一列表时，才认定为「用户从未手动编辑过首页」并覆盖成最终版：
+
+1. `legacyAndroidDefaultDashboardWidgets`（3.18 之前漏 userProfile 的版本） — 用**集合匹配**，即这 6 张卡片都在、乱序也算动过
+2. `misplacedV3_18DashboardWidgets`（3.18 第一次发版的错版） — 用**精确顺序匹配**，因为这是 3.18 自家版本，乱序的可能性低
+
+只要用户动过顺序、或增删过任何卡片（增删常用卡片会让长度或内容偏离该列表），就原样保留，**不覆盖用户自己的布局**。
+
+迁移是一次性的：迁移后写入的 `config.json` 里就是最终版，下次启动不会再命中迁移分支，不会反复覆盖。
+
+**副作用评估**：
+
+- 未手动编辑过首页的老用户：启动后首页变成最终版（这次的目的）
+- 装了 3.18 第一次版（左图错版）的用户：启动后首页变成最终版（这次的目的）
+- 手动编辑过的老用户：布局原样保留，无任何变化
+- 全新安装：直接是最终版（走 `@Default`）
+- 桌面端（`desktopDashboardWidgets` / `defaultDashboardWidgets`）**完全未动**
+
+**rebase 注意点**：
+
+- upstream 如果新增 Android 专属卡片（如 `vpnButton`，`platforms: [SupportPlatform.Android]`），别忘了判断要不要进 `defaultAndroidDashboardWidgets`
+- upstream 如果调整 `crossAxisCellCount` 或 mobile `columns`（从 8 改别的数），这套「8 列 = 整行 / 4 列 = 半宽」的排版推论要跟着重算
+- `_isLegacyAndroidDefaultDashboard` / `_isMisplacedV3_18Dashboard` 和对应的常量是**一次性迁移脚手架**：等迁移窗口过去（未来几个版本后）可以考虑删掉，别让它永久留在读路径上
+
+---
+
+### 3.19 安卓端默认开关调整（4 项，2026-10-20）
+
+| # | 设置 | UI 路径 | 全局默认 | 安卓默认 | 实际行为说明 |
+|---|---|---|---|---|---|
+| 1 | **查找进程** | 内核配置 → 常规 → 查找进程 | `FindProcessMode.off`（关） | `off`（关） | `ClashConfig.findProcessMode`。Android 端 `state.dart` 原来硬编码 `always`（绕过 `@Default`），已改为统一走 `defaultClashConfig` |
+| 2 | **网络变化时清理 DNS** | 增强工具 → 常规 → 网络变化时清理 DNS | `false` | **`true`** | `AppSettingProps.flushDnsOnNetworkChange`。网络切换时自动 `clashCore.flushDnsCache()`。桌面端字段写 true 不影响（实现里有 `system.isAndroid` 门禁） |
+| 3 | **网速通知** | 增强工具 → 常规 → 网速通知 | `false` | **`true`** | `VpnProps.networkSpeedNotification`。锁屏 / 前台时把网速切到系统通知。桌面端字段写 true 不影响（同上） |
+| 4 | **休眠支持** | 增强工具 → 常规 → 休眠支持 | `true` | **`false`** | `VpnProps.dozeSuspend`。控制是否跟随 Android Doze 模式把流量挂起。详见 3.19 子节「休眠支持说明」 |
+
+> **补充说明**：
+> - **回环保护**：`VpnProps.loopbackProtection` 全局默认 `@Default(true)`，跟随上游，不应默认关闭（已在 2026-10-20 还原）
+> - **高优先级**：`VpnProps.highPriorityNotification` 全局默认 `@Default(true)`，跟随上游
+> - **快速响应**：`VpnProps.quickResponse` 全局默认 `@Default(true)`，跟随上游
+
+**代码位置**：
+
+- `lib/models/clash_config.dart` — `ClashConfig.safeFormJson` 异常路径兜底改用 `defaultClashConfig`（与 `@Default` 对齐）
+- `lib/state.dart` — `globalState.config` getter 和 `AppState.init()` 里的 `patchClashConfig` 构造，Android 不再硬编码 `always`，改为统一走 `defaultClashConfig`
+- `lib/models/config.dart` — `VpnProps.safeFromJson` 安卓专用默认值（`networkSpeedNotification=true`、`dozeSuspend=false`）
+- `lib/models/config.dart` — `AppSettingProps.safeFromJson` 安卓专用默认值（`flushDnsOnNetworkChange=true`）
+- 同文件同函数，顺便把 `AppSettingProps.safeFromJson` 里的两个 `if (system.isAndroid)` 相邻分支合并成一个
+
+#### 「休眠支持」说明（`dozeSuspend`）
+
+它在 `android/app/src/main/kotlin/com/appshub/bettbox/modules/SuspendModule.kt` 这个 Kotlin 模块里干活，只在 Android 上生效：
+
+- **开启时**：注册监听 `SCREEN_ON` / `SCREEN_OFF` / `USER_PRESENT` / `DEVICE_IDLE_MODE_CHANGED` 4 个系统事件；当系统进入 Doze（屏幕关闭 + 设备空闲）时延迟 3 秒，调用 `Core.dozeSuspend(true)` 把当前连接挂起、降低流量；唤醒时立即恢复
+- **关闭时**：注册/反注册都跳过
+
+**用户取舍**：
+
+- 大多数普通用户：保持开启（默认 true），续航更好
+- 长期挂着代理做下载、跑脚本、做爬虫：关闭，避免 Doze 把流量挂起、任务中断
+
+3.19 把安卓默认值从 `true` 改为 `false`，更倾向「不打断长任务」。用户仍然可以在「增强工具 → 常规 → 休眠支持」开关里手动改回 true。
+
+**为什么是「Android 专用默认」而不是全局改字段默认值**：
+
+- 这三个开关的全局 `@Default` 都是上游定的（`@Default(false) flushDnsOnNetworkChange`、`@Default(false) networkSpeedNotification`、`@Default(true) dozeSuspend`）
+- 桌面端读这些字段的程序都有 `system.isAndroid &&` 包裹（`controller.dart` / `state.dart`），即使字段写 `true` / `false` 也不会真的触发别的行为
+- 全局改 `@Default` 会污染 Windows / macOS / Linux 三端用户的体验（万一哪天 upstream 在桌面端加了新逻辑，会让这些端莫名其妙就启用）
+- 「Android 专用默认 + 桌面端保留上游默认」改动最小、最可控
+
+**生效路径**：
+
+- 改动放在 `*.safeFromJson` 的 `json == null` 分支里 → 只有**全新安装**（`appSetting` / `vpnProps` 整个对象在 config.json 里都不存在）才用 Android 专用默认值
+- **老用户升级**（config.json 里已经有 appSetting / vpnProps）→ 原值保留，不会被这次改动覆盖
+- 想覆盖老用户的话，需要把单个字段单独提出来做识别（类似 3.18 dashboard 迁移「legacy 默认 → 新默认」），3.19 暂不做
+
+**副作用评估**：
+
+- 全新安卓安装：开箱即用获得游戏/长任务的合理默认值（清理 DNS ✓ / 网速通知 ✓ / 不被 Doze 打断 ✓）
+- 升级到 3.19 的老安卓用户：3 个开关在「增强工具 → 常规」里**不会自动变成新默认**，用户仍看到 3.18 之前的旧值
+- 桌面端：完全无变化（`@Default` 和字段逻辑都没动）
+
+**rebase 注意点**：
+
+- upstream 改了 `VpnProps` 默认值（任何字段），都要重新核对 `VpnProps.safeFromJson` 里 `defaultVpnProps.copyWith(...)` 跟上游是否对齐（防止漏新字段）
+- upstream 给 `clash_config.dart` 加了新的 `FindProcessMode` 值，也要核对 `safeFormJson` 的兜底分支行为
+- 4 个开关的 Android 专用默认都是「用户偏好」，将来想改回上游默认值时，把这段 `if (system.isAndroid)` 条件删掉即可
 
 ---
 

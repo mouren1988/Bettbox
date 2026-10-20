@@ -47,9 +47,10 @@ class GlobalState {
       _config ??
       Config(
         themeProps: defaultThemeProps,
-        patchClashConfig: system.isAndroid
-            ? const ClashConfig(findProcessMode: FindProcessMode.always)
-            : defaultClashConfig,
+        // [Gamebox] Android 也走 defaultClashConfig，让 findProcessMode 跟随
+        // @Default(FindProcessMode.off)。之前这里硬编码 always，会绕过
+        // clash_config.dart 的注解默认值，导致「查找进程」默认变成开启。
+        patchClashConfig: defaultClashConfig,
         networkProps: defaultNetworkProps,
         appSetting: defaultAppSettingProps,
       );
@@ -238,9 +239,8 @@ class GlobalState {
         await preferences.getConfig() ??
         Config(
           themeProps: defaultThemeProps,
-          patchClashConfig: system.isAndroid
-              ? const ClashConfig(findProcessMode: FindProcessMode.always)
-              : defaultClashConfig,
+          // [Gamebox] 同上：Android 不再强制 always，跟随 @Default(off)。
+          patchClashConfig: defaultClashConfig,
           networkProps: defaultNetworkProps,
           appSetting: defaultAppSettingProps,
         );

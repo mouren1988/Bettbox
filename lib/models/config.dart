@@ -48,7 +48,7 @@ const defaultAccessControl = AccessControl();
 final defaultThemeProps = ThemeProps(primaryColor: defaultPrimaryColor);
 
 const List<DashboardWidget> defaultDashboardWidgets = [
-  // [Gamebox] 首页顺序按确认过的排版。用户信息在网络速度右侧�?
+  // [Gamebox] 首页顺序按确认过的排版：网络速度打头，用户信息紧跟其右侧。
   DashboardWidget.networkSpeed,
   DashboardWidget.userProfile,
   DashboardWidget.trafficUsage,
@@ -60,17 +60,61 @@ const List<DashboardWidget> defaultDashboardWidgets = [
   DashboardWidget.startButton,
 ];
 
-// [Gamebox] Outbound-mode cards removed from default dashboard (desktop+Android).
-// The DashboardWidget enum values (outboundMode / outboundModeV2) are
-// permanently removed upstream of this list; see lib/enum/enum.dart.
-// safeFromJson still handles stale config files that reference the old
-// enum names by falling back to the default widget list.
-const List<DashboardWidget> defaultAndroidDashboardWidgets = [
+// [Gamebox] 3.18 之前的 Android 默认布局，仅用于 safeFromJson 里识别
+// 「用户从未手动编辑过首页」，命中则迁移到 defaultAndroidDashboardWidgets。
+// 不要把这个列表当成可用默认值 —— 新默认值见下面那个。
+//
+// [Gamebox] 这里 _唯一_保留的是「3.18 之前、从未手动编辑过首页」的老默认：
+// [networkSpeed, trafficUsage, networkDetection, connectionsCount,
+//  memoryInfo, startButton]
+// 这个列表是 #1「旧原版默认」、#2「3.18 我自己放错过的版本」
+// (#2 在 safeFromJson 里识别一次后会被覆盖；见下面注释)。
+const List<DashboardWidget> legacyAndroidDefaultDashboardWidgets = [
   DashboardWidget.networkSpeed,
   DashboardWidget.trafficUsage,
   DashboardWidget.networkDetection,
   DashboardWidget.connectionsCount,
   DashboardWidget.memoryInfo,
+  DashboardWidget.startButton,
+];
+
+// [Gamebox] 3.18 第一次发版时我放错过的版本（userProfile 占了首行）。
+// 只用来在 safeFromJson 里识别「没手动编辑但装过 3.18 第一次版」的用户，
+// 命中则一并迁移到 defaultAndroidDashboardWidgets。下次清理时和上面那个一起删。
+const List<DashboardWidget> misplacedV3_18DashboardWidgets = [
+  DashboardWidget.userProfile,
+  DashboardWidget.networkSpeed,
+  DashboardWidget.trafficUsage,
+  DashboardWidget.networkDetection,
+  DashboardWidget.connectionsCount,
+  DashboardWidget.memoryInfo,
+  DashboardWidget.startButton,
+];
+
+// [Gamebox] Outbound-mode cards removed from default dashboard (desktop+Android).
+// The DashboardWidget enum values (outboundMode / outboundModeV2) are
+// permanently removed upstream of this list; see lib/enum/enum.dart.
+// safeFromJson still handles stale config files that reference the old
+// enum names by falling back to the default widget list.
+//
+// [Gamebox] Android 默认布局（v3.18 最终版，按用户手编版确认）。
+// mobile view 固定 8 列：8 列 = 整行，4 列 = 半宽（一行并排两张）。
+//   第 1 行：网络速度(networkSpeed，整行独占，最宽)
+//   第 2 行：流量(trafficUsage) + 用户信息(userProfile)
+//   第 3 行：内存(memoryInfo)     + 网络检测(networkDetection)
+//   第 4 行：活跃连接(connectionsCount) + 启动开关(startButton)
+//
+// 之前出过两版错的：
+//   - 旧默认漏掉 userProfile（最早的原版清单）
+//   - 3.18 第一次版把 userProfile 放首位，结果 8 列宽的 networkSpeed
+//     被挤到第 2 行，整张首页布局崩。已通过 safeFromJson 迁移到本版。
+const List<DashboardWidget> defaultAndroidDashboardWidgets = [
+  DashboardWidget.networkSpeed,
+  DashboardWidget.trafficUsage,
+  DashboardWidget.userProfile,
+  DashboardWidget.memoryInfo,
+  DashboardWidget.networkDetection,
+  DashboardWidget.connectionsCount,
   DashboardWidget.startButton,
 ];
 
@@ -222,7 +266,7 @@ abstract class AppSettingProps with _$AppSettingProps {
     @Default(true) bool openLogs,
     @Default(true) bool closeConnections,
     @Default(true) bool logAiSearch,
-    @Default(false) bool flushDnsOnNetworkChange,
+    @Default(true) bool flushDnsOnNetworkChange,
     @Default(defaultTestUrl) String testUrl,
     // [Gamebox] 联动开关（首页独立启动按钮）默认关闭。上游默认 true。
     @Default(false) bool showStartSwitch,
@@ -261,25 +305,87 @@ abstract class AppSettingProps with _$AppSettingProps {
         ? defaultAppSettingProps
         : AppSettingProps.fromJson(json);
 
-    if (json != null) {
-      final oldWidgets = json['dashboardWidgets'];
-      if (oldWidgets is List) {
-        final parsedOld = dashboardWidgetsSafeFromJson(oldWidgets);
-        if (json['mobileDashboardWidgets'] == null) {
-          props = props.copyWith(mobileDashboardWidgets: parsedOld);
-        }
-        if (json['desktopDashboardWidgets'] == null) {
-          props = props.copyWith(desktopDashboardWidgets: parsedOld);
-        }
+    if (json == null) {
+      // [Gamebox] 安卓端（仅全新安装路径）的默认开关调整。
+      // 仅当 `appSetting` 整个对象在 config.json 里都不存在时（= 全新
+      // 安装）才覆盖，避免污染已有用户配置。
+      // 老用户如果以后想覆盖他的 `flushDnsOnNetworkChange`，需要把字段
+      // 单独提出来做识别（类似 3.18 dashboard 迁移）。
+      if (system.isAndroid) {
+        props = props.copyWith(
+          mobileDashboardWidgets: defaultAndroidDashboardWidgets,
+          // 增强工具 > 常规 > 网络变化时清理 DNS 缓存。
+          // 桌面端写 true 也是死值，因为 controller 里 flushDns 调用
+          // 的入口有 `system.isAndroid` 门禁。
+          flushDnsOnNetworkChange: true,
+        );
       }
-    } else if (system.isAndroid) {
-      props = props.copyWith(
-        mobileDashboardWidgets: defaultAndroidDashboardWidgets,
-      );
+      return props.copyWith(minimizeOnExit: true, openLogs: true);
+    }
+
+    final oldWidgets = json['dashboardWidgets'];
+    if (oldWidgets is List) {
+      final parsedOld = dashboardWidgetsSafeFromJson(oldWidgets);
+      if (json['mobileDashboardWidgets'] == null) {
+        props = props.copyWith(mobileDashboardWidgets: parsedOld);
+      }
+      if (json['desktopDashboardWidgets'] == null) {
+        props = props.copyWith(desktopDashboardWidgets: parsedOld);
+      }
+    }
+
+    // [Gamebox] 安卓默认布局迁移（见 GAMEBOX_CUSTOMIZATIONS.md 3.18）。
+    // 老版本出过两版错的，都识别为「用户从未手动编辑过首页」并迁移到
+    // defaultAndroidDashboardWidgets：
+    //   1) 漏 userProfile 的老默认（上线前那个版本）
+    //   2) 3.18 第一次发版把 userProfile 放首位的错版（这次）
+    // 只要用户动过顺序、或增删过任何卡片（增删常用卡片会让长度或内容
+    // 偏离该列表），就原样保留，不覆盖用户配置。
+    if (system.isAndroid) {
+      final currentMobile = props.mobileDashboardWidgets;
+      if (_isLegacyAndroidDefaultDashboard(currentMobile) ||
+          _isMisplacedV3_18Dashboard(currentMobile)) {
+        props = props.copyWith(
+          mobileDashboardWidgets: defaultAndroidDashboardWidgets,
+        );
+      }
     }
 
     return props.copyWith(minimizeOnExit: true, openLogs: true);
   }
+}
+
+/// [Gamebox] 3.18 之前漏 userProfile 的 Android 老默认。
+const _legacyAndroidDefaultDashboardSet = {
+  DashboardWidget.networkSpeed,
+  DashboardWidget.trafficUsage,
+  DashboardWidget.networkDetection,
+  DashboardWidget.connectionsCount,
+  DashboardWidget.memoryInfo,
+  DashboardWidget.startButton,
+};
+
+bool _isLegacyAndroidDefaultDashboard(List<DashboardWidget> widgets) {
+  if (widgets.length != legacyAndroidDefaultDashboardWidgets.length) {
+    return false;
+  }
+  // 用集合 + 长度双重判断：用户可能把这 6 项**乱序**排过，也算是动过。
+  final set = widgets.toSet();
+  return set.length == widgets.length &&
+      _legacyAndroidDefaultDashboardSet.containsAll(set);
+}
+
+/// [Gamebox] 3.18 第一次发版放错的版本（userProfile 排首位）。
+bool _isMisplacedV3_18Dashboard(List<DashboardWidget> widgets) {
+  if (widgets.length != misplacedV3_18DashboardWidgets.length) {
+    return false;
+  }
+  for (var i = 0; i < widgets.length; i++) {
+    if (widgets[i] != misplacedV3_18DashboardWidgets[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 @freezed
@@ -332,15 +438,15 @@ abstract class VpnProps with _$VpnProps {
     @Default(false) bool systemProxy,
     @Default(false) bool allowBypass,
     @Default(true) bool bypassPrivateRoute,
-    @Default(true) bool dozeSuspend,
+    @Default(false) bool dozeSuspend,
     @Default(false) bool smartAutoStop,
     @Default('') String smartAutoStopNetworks,
     @Default(false) bool storeFix,
     @Default(false) bool networkFix,
     @Default(true) bool loopbackProtection,
     @Default(false) bool disableQuic,
-    @Default(false) bool highPriorityNotification,
-    @Default(false) bool networkSpeedNotification,
+    @Default(true) bool highPriorityNotification,
+    @Default(true) bool networkSpeedNotification,
     @Default(false) bool excludeChina,
     // [Gamebox] 增强工具 > 托盘增强默认开启。上游默�?false。同步时保留 true�?
     @Default(true) bool trayEnhancement,
@@ -361,7 +467,8 @@ abstract class VpnProps with _$VpnProps {
       _$VpnPropsFromJson(json);
 
   factory VpnProps.safeFromJson(Map<String, Object?>? json) {
-    return json == null ? defaultVpnProps : VpnProps.fromJson(json);
+    if (json == null) return defaultVpnProps;
+    return VpnProps.fromJson(json);
   }
 }
 
