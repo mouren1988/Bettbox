@@ -815,7 +815,11 @@ Future<void> logoutPanelAccount() async {
   await tray.hideUntilLogin();
   final session = await _loadSession();
   if (session != null) {
-    unawaited(_serverLogout(session.authData));
+    // [Gamebox] 复用 clearPanelSubscriptions (即 clearPanelDataOnExit) 走和
+    // 托盘退出同一条登出路径,await 确保面板侧设备数立即减。
+    try {
+      await globalState.clearPanelSubscriptions?.call();
+    } catch (_) {}
   }
   try {
     if (globalState.isStart) {

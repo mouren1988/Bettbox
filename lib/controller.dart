@@ -1141,6 +1141,13 @@ class AppController {
         }
       }
       stopWakelockAutoRecovery();
+      // [Gamebox] 托盘退出 / 窗口 X 关闭时也要通知面板下线。
+      // clearPanelSubscriptions 即 clearPanelDataOnExit,它会 await _serverLogout,
+      // 等面板收到 logout 请求后面板侧设备数才会立即减。否则心跳停摆后要等
+      // 会话过期,导致面板「在线设备」还显示 1。
+      try {
+        await globalState.clearPanelSubscriptions?.call();
+      } catch (_) {}
       await globalState.handleBackground();
       if (system.isDesktop) {
         final prefs = await preferences.sharedPreferencesCompleter.future;
