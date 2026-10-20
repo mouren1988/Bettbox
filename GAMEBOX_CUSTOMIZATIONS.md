@@ -35,6 +35,7 @@
   - [3.14 渲染后端固定 Skia（对齐 upstream v1.19.6）](#314-渲染后端固定-skia对齐-upstream-v1196)
   - [3.15 检查更新修复（2026-10-20）](#315-检查更新修复2026-10-20)
   - [3.16 托盘退出通知面板下线（修在线设备不立即归零）](#316-托盘退出通知面板下线修在线设备不立即归零)
+  - [3.17 显示文字全部从 Bettbox 改为 Gamebox + 删启动 splash + 登录页居中（2026-10-20）](#317-显示文字全部从-bettbox-改为-gamebox--删启动-splash--登录页居中2026-10-20)
 - [5. 资源文件](#5-资源文件)
 - [6. 注释规范](#6-注释规范)
 - [7. 提交规范](#7-提交规范)
@@ -653,6 +654,68 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 **rebase 注意点**:
 - upstream 如果新增其它进程退出入口(`SIGTERM` 处理器 / `--exit` IPC / 「关闭」窗口按钮 等),**都应**调用 `globalState.clearPanelSubscriptions`,不要直接 `system.exit`
 - upstream 如果重构 `_serverLogout` 或 `clearPanelDataOnExit`,**保留 `[Gamebox]` 标记和 `await` 语义**
+
+---
+
+### 3.17 显示文字全部从 Bettbox 改为 Gamebox + 删启动 splash + 登录页居中（2026-10-20）
+
+把全 App 用户可见的 "Bettbox" 字样改成 "Gamebox",顺手清理 Android 12+ 启动 splash 显示的 "Bettbox" 字形矢量图、修正登录页(Center 居中 + 删右上角 _LoginWindowButtons 三个内置窗口按钮)。
+
+| 项 | 改前 | 改后 |
+|---|---|---|
+| `AndroidManifest.xml` `android:label` | `"Bettbox"`（application + tile 各一处） | `"Gamebox"` |
+| 4 个 `strings.xml` `bett_box` 字符串值 | `"Bettbox"`（values / zh-rCN / zh-rTW / ru） | `"Gamebox"`（包名 `com.appshub.bettbox.*` 保留不动,改动只覆盖显示） |
+| VPN/服务/Toast 用户可见文字 | `setSession("Bettbox")`、`setContentTitle("Bettbox")`、3 个 channel 名 `"Bettbox Service" / ... High / ... Suspended`、2 个 Toast `"Bettbox Connected" / ... Suspended` | `setSession("Gamebox")`、`setContentTitle("Gamebox")`、channel 名 `"Gamebox ..."`、Toast 改 `"Gamebox ..."` |
+| 渠道 ID `NOTIFICATION_CHANNEL` 等 | 保留 `"Bettbox"` / `"Bettbox_High"` / `"Bettbox_Suspended"` | **保持不变**（内部技术键,改会导致旧用户重装时 channel 无法复用,造成系统通知设置里出现两个渠道） |
+| Android 12+ 启动 splash | `windowSplashScreenAnimatedIcon = @drawable/splash_text_light`（白底黑字"Bettbox"字形矢量图） | 删除该属性,splash 阶段只显示纯背景色（白/黑）→ 立刻交给 Flutter 接管 |
+| `drawable/splash_text_light.xml`、`drawable/splash_text_dark.xml` | 引用方已删除 | 一并物理删除文件 |
+| `PanelLoginGate` 布局 | `Stack + Positioned(置顶/最小化/关闭)`,`Padding(top:28)` 套表单 | `Column(顶 28px window drag | Expanded(GestDetector for drag + Center + SingleChildScrollView 内填表单))`,登录卡在窗口内水平+垂直居中；移除右上角 _LoginWindowButtons 后用户用 OS title bar / window drag 区域操作 |
+| `_LoginWindowButtons` widget | 3 个 IconButton(置顶/最小化/关闭)覆盖在登录卡右上角 | 整个类删除；helper `_icon` 也一并删除 |
+| `lib/controller.dart` profile 默认名 | `profile?.label ?? 'Bettbox'` | 保留（无 fallback 时 fallback,非用户可见字符串） |
+| Toast 用户可见 | `Bettbox Connected` / `Bettbox Suspended` | 已改为 `Gamebox Connected` / `Gamebox Suspended` |
+| 包名 `com.appshub.bettbox.*`、类名 `BettboxService`/`BettboxVpnService`/`BettboxApplication`、window class `GAMEBOX_RUNNER_WIN32_WINDOW`、AUMID `Appshub.Gamebox`、URL scheme `bettbox://` | — | **未动**（这些都不是用户面向的显示文字,改包名是超大工程且要动签名/桌面快捷方式/卸载残留清理） |
+
+**代码位置**:
+
+- `android/app/src/main/AndroidManifest.xml` — application + tile label
+- `android/app/src/main/res/values{,-v27,-night,-night-v27}/styles.xml` — 删除 `windowSplashScreenAnimatedIcon`
+- `android/app/src/main/res/values{,-zh-rCN,-zh-rTW,-ru}/strings.xml` — `bett_box` 字符串值
+- `android/app/src/main/kotlin/com/appshub/bettbox/services/BaseServiceInterface.kt` — `setContentTitle("Gamebox")` + 3 个 channel 显示名
+- `android/app/src/main/kotlin/com/appshub/bettbox/services/BettboxVpnService.kt` — `setSession("Gamebox")`
+- `android/app/src/main/kotlin/com/appshub/bettbox/plugins/VpnPlugin.kt` — 2 个 Toast 文案
+- `lib/views/panel_login.dart` — `PanelLoginGate` 重构（Stack → Column + Center + 顶部 drag 条）；`_LoginWindowButtons` 类 + `_icon` helper 删除
+- `android/app/src/main/res/drawable/splash_text_{light,dark}.xml` — 删除
+
+**为什么这么做(用户问题)**:
+
+1. **手机/桌面应用名 / 通知 / Toast 还是显示 "Bettbox"** —— 上游 `Bettbox` 是旧名,现在是 fork 项目叫 Gamebox,所有面向用户文字必须跟进
+2. **打开应用瞬间有一闪而过的白底黑字 "Bettbox" 动画,再跳到登录界面** —— 这是 Android 12+ 的 SplashScreen 系统 API,读 `LaunchTheme` 的 `windowSplashScreenAnimatedIcon`,而该图标是两张矢量图(`splash_text_{light,dark}.xml`),`pathData` 是 "Bettbox" 字母的 vector outlines。Android 12 在主 Activity 起来前会强制 overlay 一段 splash,不显示就让 splash 完全消失
+3. **Android 登录界面整体不居中,右上角有 「置顶/最小化/关闭」三个 Windows 风格按钮** —— `PanelLoginGate` 用 Stack + Positioned 把这三个 IconButton 浮在登录卡右上角;卡片本体被 `Padding(top:28)` 顶上去没有水平居中约束。把栈拆成 Column + Center,顶部留 28px 给 window drag,登录卡在窗口内居中显示
+
+**为什么 channel 名/ID 不一并改**:
+
+- `setContentTitle("Bettbox")` 等渠道名(用户看到的)已改为 `Gamebox`,这部分是用户可见的
+- `NOTIFICATION_CHANNEL = "Bettbox"` 这种是渠道 ID(技术键),Android 用来区分渠道;改 ID 后老用户重装时会出现两组渠道（一个旧 "Bettbox" 系统无法回收,一个 "Gamebox" 全新),反而给用户提示「两个 Gamebox」
+- 用户原话「只改显示文字,包名可以不改」—— 渠道 ID 属于同类(技术键,不用户可见),保留稳
+
+**为什么 splash 字形不重新画一个 "Gamebox" letterforms**:
+
+- vector path 字母绘制要逐字描述坐标,7 个字符几百条 path 数据,手写字母 path 易误、易失真
+- 用户口径就是「直接删除掉这个动画也可以,不需要」,所以走最简路线:删图标属性 + 删图标资源,splash 阶段只剩 0.x 秒背景色
+
+**副作用评估**:
+
+- 渠道 ID 保留,Android 11- 老用户重装通知设置里不会出现重复渠道;Android 12+ 渠道名 "Gamebox ..." 显示正常
+- splash 阶段纯背景色 < 0.5 秒,Flutter 启动不会被明显拉长（系统 splash API 仍然在跑,只是不显示中央图标）
+- 登录页 `_LoginWindowButtons` 移除后,**Android 设备** 没影响（Android 屏幕最大化的应用本来就没这三键,PanelLoginGate 在 Android 上是全屏；这三键只对 Windows/Linux desktop 上的小型 login window 才有意义）；**Windows/Linux** 上用户可以通过 OS title bar 或顶部 28px drag 区拖窗口 / 最小化 / 关闭,功能没丢
+- 包名、签名、桌面快捷方式、注册表 key (`Software\\Gamebox`、`CSIDL_DESKTOPDIRECTORY` lnk) 路径都保留,升级是同一图标+签名,无需卸载（与 1.19.6 自身更新路径一致）
+
+**rebase 注意点**:
+
+- upstream 如果新增通知渠道（VPN / service / suspended）代码块,**保留 `[Gamebox]` 标记**,`setContentTitle` / 渠道显示名 / Toast 文案都得是 "Gamebox"
+- upstream 如果调整 `PanelLoginGate` 布局,**不要再把 `_LoginWindowButtons` 拿回来**（用户已表态移除）
+- upstream 如果启用 Android splash icon,**留空 `windowSplashScreenAnimatedIcon`** 或重新画图标,不要复用 `splash_text_light.xml`（上游也是把这 path 当字母 "Bettbox" 用的）
+- upstream 如果改 strings.xml 的 `bett_box` key 名,新版顺手把 value 也对齐 "Gamebox"
 
 ---
 

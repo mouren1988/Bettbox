@@ -31,115 +31,48 @@ class _PanelLoginGateState extends State<PanelLoginGate> {
     final scheme = context.colorScheme;
     return Material(
       color: scheme.surfaceContainerHigh,
-      child: Stack(
+      // [Gamebox] 顶部 28px 留给 window drag (登录小窗没有 OS title bar,
+      // 没这块用户没办法从顶部往下拖动窗口)。其余空间内容居中显示。
+      child: Column(
         children: [
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onPanStart: (_) => windowManager.startDragging(),
-            child: Padding(
-              // [Gamebox] 窗口加高后内容偏上，整体下移一点。
-              padding: const EdgeInsets.only(top: 28),
-              child: _changePassword
-                ? _PanelChangePasswordDialog(
-                    username: _username,
-                    embedded: true,
-                    onClose: () => setState(() => _changePassword = false),
-                  )
-                : _PanelLoginForm(
-                    onChangePassword: (name) {
-                      setState(() {
-                        _username = name;
-                        _changePassword = true;
-                      });
-                    },
-                  ),
+          SizedBox(
+            height: 28,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanStart: (_) => windowManager.startDragging(),
             ),
           ),
-          const Positioned(
-            top: 0,
-            right: 0,
-            child: _LoginWindowButtons(),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanStart: (_) => windowManager.startDragging(),
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: _changePassword
+                      ? _PanelChangePasswordDialog(
+                          username: _username,
+                          embedded: true,
+                          onClose: () => setState(
+                            () => _changePassword = false,
+                          ),
+                        )
+                      : _PanelLoginForm(
+                          onChangePassword: (name) {
+                            setState(() {
+                              _username = name;
+                              _changePassword = true;
+                            });
+                          },
+                        ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
-}
-
-class _LoginWindowButtons extends StatefulWidget {
-  const _LoginWindowButtons();
-
-  @override
-  State<_LoginWindowButtons> createState() => _LoginWindowButtonsState();
-}
-
-class _LoginWindowButtonsState extends State<_LoginWindowButtons> {
-  bool _pinned = false;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_readPin());
-  }
-
-  Future<void> _readPin() async {
-    final pinned = await windowManager.isAlwaysOnTop();
-    if (!mounted) return;
-    setState(() => _pinned = pinned);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = context.colorScheme.onSurface;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _icon(
-          tooltip: '置顶',
-          color: color,
-          icon: _pinned ? Icons.push_pin : Icons.push_pin_outlined,
-          onPressed: () async {
-            final next = !_pinned;
-            await windowManager.setAlwaysOnTop(next);
-            if (!mounted) return;
-            setState(() => _pinned = next);
-          },
-        ),
-        _icon(
-          tooltip: '最小化',
-          color: color,
-          icon: Icons.remove,
-          onPressed: () => windowManager.minimize(),
-        ),
-        _icon(
-          tooltip: '关闭',
-          color: color,
-          icon: Icons.close,
-          onPressed: () {
-            globalState.appController.unBackBlock();
-            // [Gamebox] 登录窗状态下点 X 彻底退出，和托盘退出走同一条 handleExit 路径，
-            // 避免"窗口已隐藏但 gamebox 进程 + clash 内核仍残留"（登录窗被 hideUntilLogin
-            // 销毁了托盘图标，进程残留用户看不到、也点不到）。
-            globalState.appController.handleExit();
-          },
-        ),
-      ],
-    );
-  }
-}
-
-Widget _icon({
-  required String tooltip,
-  required Color color,
-  required IconData icon,
-  required VoidCallback onPressed,
-}) {
-  return IconButton(
-    tooltip: tooltip,
-    visualDensity: VisualDensity.compact,
-    onPressed: onPressed,
-    icon: Icon(icon, size: 18, color: color),
-  );
 }
 
 class _PanelLoginForm extends StatefulWidget {

@@ -53,10 +53,40 @@ Future<void> main(List<String> args) async {
   PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
 
   final version = await system.version;
-  await Future.wait([globalState.initApp(version), clashCore.preload()]);
-
+  // [Gamebox] 同样加超时：globalState.initApp / clashCore.preload 任一个挂死会冻住整个
+  // Flutter 启动流程。给整个 wait 一个 10 秒兜底,Android 上即使初化没全跑完,也确保
+  // runApp() 一定要执行到,主界面先亮。
   try {
-    await uiManager.initializeUI();
+    await Future.wait([
+      globalState.initApp(version),
+      clashCore.preload(),
+    ]).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        commonPrint.error(
+          'initApp / clashCore.preload timed out after 10s, continuing startup',
+        );
+        return <void>[];
+      },
+    );
+  } catch (e) {
+    commonPrint.error('initApp / clashCore.preload failed: $e');
+  }
+
+  // [Gamebox] uiManager.initializeUI 内部开 Isolate.run 拷 UI 资源。
+  // 在某些 Android 设备 / 模拟器上 Isolate.run 可能挂住（不返回也不抛），
+  // 不 timeout 就会让 Flutter 永远停在闪屏。
+  // 这里用 20 秒兜底超时，超时只记日志不阻断启动 —— 主界面先走起来，
+  // UI 资源后续由弹窗/重试逻辑慢慢补。
+  try {
+    await uiManager.initializeUI().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        commonPrint.error(
+          'uiManager.initializeUI timed out after 20s, continuing without UI assets',
+        );
+      },
+    );
   } catch (e) {
     commonPrint.error('Failed to initialize UI: $e');
   }
