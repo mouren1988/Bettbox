@@ -418,6 +418,7 @@ flutter analyze --no-pub
 | 头像 | 本地 `mouren1988.jpg`(不联网) | `lib/views/about.dart` | `// [Gamebox] 头像本地化` |
 | X-Client-OS 平台上报 | 原来写死 `'windows'`,改为 `switch (defaultTargetPlatform)` 动态返回 `'android'` / `'ios'` / `'linux'` / `'macos'` / `'windows'` | `lib/panel/panel_auth.dart` | `// [Gamebox] 按真实平台上报 X-Client-OS` |
 | UA 输入框默认值处理 | 内置默认 UA (`defaultGlobalUa = 'Gamebox'`)不预填到输入框;用户自填内容加 `obscureText` 密码掩码 | `lib/views/config/general.dart` | `// [Gamebox] 内置 UA 不回显 / 用户 UA 加掩码` |
+| 订阅智能下发 flag | `_fetchSubscribePreferRelay` 请求时加 `&flag=clash` 参数;`panelSubscribeRelayUrl` 生成订阅 URL 时也带 `&flag=clash`。与 v2board `ClientController::subscribe` 对齐,让面板能根据 flag 匹配正确的协议处理器(v2rayN/Clash/Singbox 等) | `lib/panel/panel_auth.dart` | `// [Gamebox] 订阅请求带 flag 参数:flag=clash → Clash YAML` |
 
 ### 3.9 i18n 锁 zh_CN（设置页只显示简体中文）
 
