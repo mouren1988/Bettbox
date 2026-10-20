@@ -667,12 +667,9 @@ bool isPanelSubscribeUrl(String url) {
   return host == originHost || host == relayHost;
 }
 
-/// 构建面板订阅 URL，flag 用于智能下发。
-/// flag 可选：v2rayn / clash / sing-box 等，见 v2board ClientController::subscribe。
-String panelSubscribeRelayUrl(String token, {String? flag}) {
+String panelSubscribeRelayUrl(String token) {
   final t = Uri.encodeQueryComponent(token.trim());
-  final flagParam = flag != null && flag.isNotEmpty ? '&flag=$flag' : '';
-  return '${_trimBase(panelSubRelayBase)}$_subscribePath?token=$t$flagParam';
+  return '${_trimBase(panelSubRelayBase)}$_subscribePath?token=$t';
 }
 
 Future<
@@ -681,18 +678,13 @@ Future<
     String? disposition,
     String? userinfo,
   })
-> _fetchSubscribePreferRelay(String token, {String? flag}) {
+> _fetchSubscribePreferRelay(String token) {
   final q = Uri.encodeQueryComponent(token.trim());
-  // [Gamebox] flag 用于智能下发：面板根据 flag 匹配协议处理器。
-  // - v2rayN: flag=v2rayn → General (base64 vmess)
-  // - Clash: flag=clash → Clash YAML
-  // - 无 flag → 默认走 General（v2board 行为）
-  final flagParam = flag != null && flag.isNotEmpty ? '&flag=$flag' : '';
   return _preferRelayThenOrigin(
     relayBases: const [panelSubRelayBase],
     originBase: panelSiteBase,
     run: (base) {
-      final url = '$base$_subscribePath?token=$q$flagParam';
+      final url = '$base$_subscribePath?token=$q';
       final isOrigin = base == _trimBase(panelSiteBase);
       return _downloadSubscribeBytes(
         url,
@@ -703,46 +695,37 @@ Future<
 }
 
 /// 手动/自动更新：反代优先，源站兜底；Profile.url 始终写成反代地址。
-/// [Gamebox] 同步支持 flag 智能下发，URL 格式: /subscribe?token=xxx&flag=yyy。
 Future<Profile> updatePanelSubscribeProfile(
   Profile profile, {
   bool validate = true,
-  String? flag,
 }) async {
-  final uri = Uri.tryParse(profile.url);
-  final token = uri?.queryParameters['token']?.trim() ?? '';
+  final token = Uri.tryParse(profile.url)?.queryParameters['token']?.trim() ?? '';
   if (token.isEmpty) {
     throw Exception('面板订阅缺少 token');
   }
-  // [Gamebox] flag 从 URL 解析（如有）或外部传入，用于智能下发。
-  final effectiveFlag = uri?.queryParameters['flag']?.trim() ?? flag ?? '';
-  final fetched = await _fetchSubscribePreferRelay(token, flag: effectiveFlag);
+  final fetched = await _fetchSubscribePreferRelay(token);
   final panelName = utils.getFileNameForDisposition(fetched.disposition);
   final label = (panelName == null || panelName.trim().isEmpty)
       ? profile.label
       : panelName.trim();
   return profile
       .copyWith(
-        url: panelSubscribeRelayUrl(token, flag: effectiveFlag),
+        url: panelSubscribeRelayUrl(token),
         label: label,
         subscriptionInfo: SubscriptionInfo.formHString(fetched.userinfo),
       )
       .saveFile(fetched.bytes, validate: validate);
 }
 
-/// [Gamebox] 导入订阅时请求 Clash YAML 格式（flag=clash），
-/// 与 v2board 的 v2rayN 智能下发对齐。
 Future<void> _importSubscription(_PanelSession session) async {
   final token = session.subscribeToken.trim();
-  // [Gamebox] flag=clash：请求 Clash YAML 格式，而非 base64 URI 列表。
-  // 对齐 v2board ClientController::subscribe 的智能下发逻辑。
-  const subscribeFlag = 'clash';
-  final fetched = await _fetchSubscribePreferRelay(token, flag: subscribeFlag);
+  // [Gamebox] 反代优先拉内容；写入的 Profile.url 也是反代（源站仅失败时才用）。
+  final fetched = await _fetchSubscribePreferRelay(token);
   final panelName = utils.getFileNameForDisposition(fetched.disposition);
   final label = (panelName == null || panelName.trim().isEmpty)
       ? null
       : panelName.trim();
-  final url = panelSubscribeRelayUrl(token, flag: subscribeFlag);
+  final url = panelSubscribeRelayUrl(token);
   // [Gamebox] 按 url sha256 当 id；先查本地同 id 的 profile，
   // 复用旧的 selectedMap，避免「重登后节点丢失」（见 customizations 文档）。
   final id = sha256.convert(utf8.encode(url)).toString().substring(0, 16);
