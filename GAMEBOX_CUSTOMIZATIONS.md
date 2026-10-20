@@ -6,7 +6,7 @@
 > 3. 提供完整的"同步上游 / rebase / 解决冲突"操作流程
 > 4. 任何修改都要带 `// [Gamebox]` 注释，并同步更新本文件
 
-**当前 `gamebox` 分支 HEAD**：`62003a8c`（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
+**当前 `gamebox` 分支 HEAD**：`caf6f831`（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
 **当前 `main` 分支 HEAD**：`7006a026`（严格等于 `upstream/main`，**不可变**）
 **当前发布版本**：`1.19.6`（`pubspec.yaml` + `version.json`）
 **当前发布时间**：`2026-10-19`
