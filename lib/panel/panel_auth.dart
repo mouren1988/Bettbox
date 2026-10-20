@@ -8,6 +8,7 @@ import 'package:bett_box/models/models.dart';
 import 'package:bett_box/panel/panel_site.dart';
 import 'package:bett_box/state.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 
@@ -205,13 +206,33 @@ Future<({int status, String text})> _getTextApi(
   );
 }
 
+/// [Gamebox] 面板 X-Client-OS 取值。面板侧 mapNormalizedOsHeader 用 str_contains
+/// 模糊匹配，所以只要小写平台名里含 android/ios/win/mac/linux 即可命中，
+/// 无需和面板枚举字面一致。
+String get _panelClientOs {
+  // [Gamebox] 面板 X-Client-OS 取值。面板侧 mapNormalizedOsHeader 用
+  // str_contains 模糊匹配，所以只要小写平台名里含 android/ios/win/mac/linux
+  // 即可命中，无需和面板枚举字面一致；fuchsia 兜底成 linux。
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.android => 'android',
+    TargetPlatform.iOS => 'ios',
+    TargetPlatform.fuchsia => 'linux',
+    TargetPlatform.linux => 'linux',
+    TargetPlatform.macOS => 'macos',
+    TargetPlatform.windows => 'windows',
+  };
+}
+
 Future<Map<String, String>> _headers({String? bearer}) async {
   final headers = <String, String>{
     HttpHeaders.contentTypeHeader: 'application/json',
     HttpHeaders.acceptHeader: 'application/json',
     HttpHeaders.userAgentHeader: AppIdentity.productName,
     'X-Device-Id': await _deviceId(),
-    'X-Client-OS': 'windows',
+    // [Gamebox] 之前这里写死 'windows'，面板 normalizeClientPlatform 把
+    // X-Client-OS 当最高优先级（非空即返回），导致安卓/iOS 登录在线设备
+    // 全被记成 windows。改为按真实运行平台上报。
+    'X-Client-OS': _panelClientOs,
   };
   if (bearer != null && bearer.isNotEmpty) {
     headers[HttpHeaders.authorizationHeader] = 'Bearer $bearer';

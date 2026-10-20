@@ -50,6 +50,12 @@ class UaItem extends ConsumerStatefulWidget {
 class _UaItemState extends ConsumerState<UaItem> {
   String _lastCustomUa = '';
 
+  // [Gamebox] globalUa 的默认值就是应用自己的名字（defaultGlobalUa），
+  // 不是用户填的隐私信息，没有任何展示价值。之前点「自定义」会把
+  // InputDialog 的 value 直接设成它，等于把内置常量摊开给使用者看。
+  // 这里只判断"当前值是不是内置默认值"，是则按未自定义处理。
+  bool get _isBuiltInUa => _lastCustomUa == defaultGlobalUa;
+
   @override
   Widget build(BuildContext context) {
     final globalUa = ref.watch(
@@ -82,7 +88,12 @@ class _UaItemState extends ConsumerState<UaItem> {
             final customUa = await globalState.showCommonDialog<String>(
               child: InputDialog(
                 title: appLocalizations.custom,
-                value: _lastCustomUa,
+                // [Gamebox] 当前是内置默认值时不回显，避免暴露内置 UA 串。
+                value: _isBuiltInUa ? '' : _lastCustomUa,
+                // [Gamebox] 用户自填的内容同样不明文显示：加 obscureText 后
+                // 输入框走 visiblePassword 掩码（InputDialog 内部会自动把
+                // maxLines 压到 1）。底层逻辑与提交路径不受影响。
+                obscureText: true,
                 hintText: 'Clash.Meta',
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {

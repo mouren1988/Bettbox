@@ -9,7 +9,7 @@
 **当前 `gamebox` 分支 HEAD**：`caf6f831`（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
 **当前 `main` 分支 HEAD**：`7006a026`（严格等于 `upstream/main`，**不可变**）
 **当前发布版本**：`1.19.6`（`pubspec.yaml` + `version.json`）
-**当前发布时间**：`2026-10-19`
+**当前发布时间**：`2026-10-20`
 
 ---
 
@@ -415,7 +415,9 @@ flutter analyze --no-pub
 |---|---|---|---|
 | 启动 Gate | `ValueListenableBuilder(panelUnlocked)` 未解锁显示 `PanelLoginGate`,解锁后显示 `HomePage` | `lib/application.dart` (`_AppHome` widget) | `// [Gamebox] 启动登录 Gate` |
 | 修改密码入口 | 退出账号时显示 | `lib/views/dashboard/widgets/user_profile.dart` | `// [Gamebox] 退出账号菜单` |
-| 头像 | 本地 `mouren1988.jpg`（不联网）| `lib/views/about.dart` | `// [Gamebox] 头像本地化` |
+| 头像 | 本地 `mouren1988.jpg`(不联网) | `lib/views/about.dart` | `// [Gamebox] 头像本地化` |
+| X-Client-OS 平台上报 | 原来写死 `'windows'`,改为 `switch (defaultTargetPlatform)` 动态返回 `'android'` / `'ios'` / `'linux'` / `'macos'` / `'windows'` | `lib/panel/panel_auth.dart` | `// [Gamebox] 按真实平台上报 X-Client-OS` |
+| UA 输入框默认值处理 | 内置默认 UA (`defaultGlobalUa = 'Gamebox'`)不预填到输入框;用户自填内容加 `obscureText` 密码掩码 | `lib/views/config/general.dart` | `// [Gamebox] 内置 UA 不回显 / 用户 UA 加掩码` |
 
 ### 3.9 i18n 锁 zh_CN（设置页只显示简体中文）
 
@@ -720,29 +722,32 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 
 ---
 
-### 3.18 安卓端首页默认卡片布局（补回 userProfile + 重排）
+### 3.18 安卓端首页默认卡片布局（v3.20 瀑布流最终版）
 
 | 列 | 行号 | 改前（左图错版） | 改后（右图确认版） |
 |---|---|---|---|
 | 1 | 第 1 行（整行） | userProfile 放第 1 位（4 列宽，右侧空 4 列） | **networkSpeed** 放第 1 位（8 列宽，整行） |
 | 2 | 第 2 行 | networkSpeed + trafficUsage | **trafficUsage + userProfile** |
-| 3 | 第 3 行 | networkDetection + connectionsCount | **memoryInfo + networkDetection** |
-| 4 | 第 4 行 | memoryInfo（孤立） | **connectionsCount + startButton** |
-| 5 | 第 5 行 | startButton（孤立） | （没有空行） |
+| 3 | 第 3 行 | networkDetection + connectionsCount | **mediaUnlockSmall(连通性测试) + networkDetection** |
+| 4 | 第 4 行 | memoryInfo（孤立） | **startButton + connectionsCount** |
+| 5 | 第 5 行 | startButton（孤立） | **memoryInfo** |
 
 3.18 期间出过两版错的，**最终版**是右图（你手动编辑的版本）：
 
 ```dart
 const defaultAndroidDashboardWidgets = [
-  networkSpeed,    // 8 列宽 → 第 1 行独占（最宽的卡片在最顶上）
-  trafficUsage,    // ┐
-  userProfile,     // ┘ 第 2 行 并排
-  memoryInfo,      // ┐
-  networkDetection,// ┘ 第 3 行 并排
-  connectionsCount,// ┐
-  startButton,     // ┘ 第 4 行 并排
+  networkSpeed,          // 8 列宽 → 第 1 行独占（最宽的卡片在最顶上）
+  trafficUsage,          // ┐
+  userProfile,           // ┘ 第 2 行 并排
+  mediaUnlockSmall,      // ┐
+  networkDetection,      // ┘ 第 3 行 并排（右边 networkDetection 比左矮，下方空位）
+  startButton,           // ┐
+  connectionsCount,      // ┘ 第 4 行 并排（connectionsCount 被挤到下一行左侧）
+  memoryInfo,            // 第 5 行 整行
 ];
 ```
+
+**瀑布流落位说明**：masonry 瀑布流（见 `widgets/grid.dart` 的 `_getOrigin`）每张卡落在当前 `dy` 最小的列上。`mediaUnlockSmall` 比 `networkDetection` 矮，右列下方会留空位；必须让矮的 `startButton` 紧跟在 `networkDetection` 后面去填那个空位，高一些的 `connectionsCount` 才会被挤到下一行左侧。
 
 **为什么要重排（这次为啥左图错了）**：
 
@@ -753,40 +758,38 @@ mobile view 固定 8 列。`crossAxisCellCount: 8` 的卡片=整行独占，`cro
 
 所以「网络速度永远该在最顶」，这是这个 8 列布局的天然最优解。
 
+**版本历史**：
+
+| 版本 | 问题 |
+|---|---|
+| v3.18 之前 | 漏 userProfile |
+| v3.18 第一版 | 把 userProfile 放首位，networkSpeed 被挤到第 2 行 |
+| v3.19 第一版 | 第 3 行放反（memoryInfo \| networkDetection），漏 mediaUnlock |
+| v3.20 第一/二版 | 以为左右对调即可，来回改了两遍 |
+| **v3.20 最终版** | 瀑布流落位：mediaUnlockSmall → networkDetection → startButton → connectionsCount |
+
 **代码位置**：
 
 - `lib/models/config.dart` — `defaultAndroidDashboardWidgets` 最终版
-- `lib/models/config.dart` — `legacyAndroidDefaultDashboardWidgets`（3.18 之前漏 userProfile 的版本，作迁移比对用）
-- `lib/models/config.dart` — `misplacedV3_18DashboardWidgets`（**新增** — 3.18 第一次发版的错版，作迁移比对用，过几个版本后可删）
+- `lib/models/config.dart` — `legacyAndroidDefaultDashboardWidgets`（v3.18 之前漏 userProfile 的版本，作迁移比对用）
+- `lib/models/config.dart` — `misplacedV3_18DashboardWidgets`（v3.18 第一次发版的错版，作迁移比对用，过几个版本后可删）
 - `lib/models/config.dart` — `_isLegacyAndroidDefaultDashboard()` + `_isMisplacedV3_18Dashboard()`（双迁移分支）
-- `lib/models/config.dart` — 顺手修掉 `defaultDashboardWidgets` 注释里的一个乱码字符
+- `lib/models/config.dart` — `AppSettingProps.safeFromJson` 里的 v3.20 注释更新
 
 **为什么需要迁移逻辑（不只是改默认值）**：
 
-`AppSettingProps.safeFromJson` 的 `@Default` **只在 JSON 里完全没有该字段时**生效。已安装用户的 `config.json` 里 `mobileDashboardWidgets` 已经有值（就是旧默认那 6 项），所以**光改 `defaultAndroidDashboardWidgets` 对老用户无效**，他们的首页还是旧排版。
+`AppSettingProps.safeFromJson` 的 `@Default` **只在 JSON 里完全没有该字段时**生效。已安装用户的 `config.json` 里 `mobileDashboardWidgets` 已经有值，所以**光改 `defaultAndroidDashboardWidgets` 对老用户无效**，他们的首页还是旧排版。
 
 因此加了一条迁移：仅当 `system.isAndroid` 且读回来的 `mobileDashboardWidgets` **等于**以下任一列表时，才认定为「用户从未手动编辑过首页」并覆盖成最终版：
 
-1. `legacyAndroidDefaultDashboardWidgets`（3.18 之前漏 userProfile 的版本） — 用**集合匹配**，即这 6 张卡片都在、乱序也算动过
-2. `misplacedV3_18DashboardWidgets`（3.18 第一次发版的错版） — 用**精确顺序匹配**，因为这是 3.18 自家版本，乱序的可能性低
+1. `legacyAndroidDefaultDashboardWidgets`（v3.18 之前漏 userProfile 的版本） — 用**集合匹配**，即这 6 张卡片都在、乱序也算动过
+2. `misplacedV3_18DashboardWidgets`（v3.18 第一次发版的错版） — 用**精确顺序匹配**，因为这是 v3.18 自家版本，乱序的可能性低
 
 只要用户动过顺序、或增删过任何卡片（增删常用卡片会让长度或内容偏离该列表），就原样保留，**不覆盖用户自己的布局**。
 
 迁移是一次性的：迁移后写入的 `config.json` 里就是最终版，下次启动不会再命中迁移分支，不会反复覆盖。
 
-**副作用评估**：
-
-- 未手动编辑过首页的老用户：启动后首页变成最终版（这次的目的）
-- 装了 3.18 第一次版（左图错版）的用户：启动后首页变成最终版（这次的目的）
-- 手动编辑过的老用户：布局原样保留，无任何变化
-- 全新安装：直接是最终版（走 `@Default`）
-- 桌面端（`desktopDashboardWidgets` / `defaultDashboardWidgets`）**完全未动**
-
-**rebase 注意点**：
-
-- upstream 如果新增 Android 专属卡片（如 `vpnButton`，`platforms: [SupportPlatform.Android]`），别忘了判断要不要进 `defaultAndroidDashboardWidgets`
-- upstream 如果调整 `crossAxisCellCount` 或 mobile `columns`（从 8 改别的数），这套「8 列 = 整行 / 4 列 = 半宽」的排版推论要跟着重算
-- `_isLegacyAndroidDefaultDashboard` / `_isMisplacedV3_18Dashboard` 和对应的常量是**一次性迁移脚手架**：等迁移窗口过去（未来几个版本后）可以考虑删掉，别让它永久留在读路径上
+> **v3.20 行为说明**：v3.20 **不按「元素集合相同」强制刷新顺序**。瀑布流的实际落位由卡片高度决定，用户装新包就会拿到新默认值，无需覆盖持久化里的顺序（会破坏用户手动排的版）。
 
 ---
 

@@ -97,25 +97,38 @@ const List<DashboardWidget> misplacedV3_18DashboardWidgets = [
 // safeFromJson still handles stale config files that reference the old
 // enum names by falling back to the default widget list.
 //
-// [Gamebox] Android 默认布局（v3.18 最终版，按用户手编版确认）。
+// [Gamebox] Android 默认布局（v3.20 最终版，按用户手编版确认）。
 // mobile view 固定 8 列：8 列 = 整行，4 列 = 半宽（一行并排两张）。
 //   第 1 行：网络速度(networkSpeed，整行独占，最宽)
-//   第 2 行：流量(trafficUsage) + 用户信息(userProfile)
-//   第 3 行：内存(memoryInfo)     + 网络检测(networkDetection)
-//   第 4 行：活跃连接(connectionsCount) + 启动开关(startButton)
+//   第 2 行：流量统计(trafficUsage) + 订阅信息(userProfile)
+//   第 3 行：连通性测试(mediaUnlockSmall) + 网络检测(networkDetection)
+//   第 4 行：启动开关(startButton) + 活跃连接(connectionsCount)
+//   第 5 行：内存信息(memoryInfo)
 //
-// 之前出过两版错的：
+// ⚠ 注意：这不是普通网格，而是 masonry 瀑布流（见 widgets/grid.dart 的
+// `_getOrigin`）。每张卡落在当前 dy 最小的列上，所以「行」只是视觉结果，
+// 真实落位由卡片高度决定。第 3 行右边的 networkDetection 比左边的
+// mediaUnlockSmall 矮，右列下方会留一个空位；必须让**矮的** startButton
+// 紧跟在 networkDetection 后面去填那个空位，高一点的 connectionsCount
+// 才会被挤到下一行左侧。把这两张卡的顺序反过来就会得到
+// 「连通性测试 | 网络检测 / 活跃连接 | 启动开关」的错版。
+//
+// 之前出过几版错的：
 //   - 旧默认漏掉 userProfile（最早的原版清单）
 //   - 3.18 第一次版把 userProfile 放首位，结果 8 列宽的 networkSpeed
-//     被挤到第 2 行，整张首页布局崩。已通过 safeFromJson 迁移到本版。
+//     被挤到第 2 行，整张首页布局崩。
+//   - 3.19 第一版第 3 行放反(memoryInfo | networkDetection)，且漏了
+//     mediaUnlock(连通性测试)。已通过 safeFromJson 迁移到本版。
+//   - 3.20 误以为左右对调即可，来回改了两次，实际是瀑布流落位问题。
 const List<DashboardWidget> defaultAndroidDashboardWidgets = [
   DashboardWidget.networkSpeed,
   DashboardWidget.trafficUsage,
   DashboardWidget.userProfile,
-  DashboardWidget.memoryInfo,
+  DashboardWidget.mediaUnlockSmall,
   DashboardWidget.networkDetection,
-  DashboardWidget.connectionsCount,
   DashboardWidget.startButton,
+  DashboardWidget.connectionsCount,
+  DashboardWidget.memoryInfo,
 ];
 
 List<DashboardWidget> dashboardWidgetsSafeFromJson(
@@ -338,9 +351,12 @@ abstract class AppSettingProps with _$AppSettingProps {
     // 老版本出过两版错的，都识别为「用户从未手动编辑过首页」并迁移到
     // defaultAndroidDashboardWidgets：
     //   1) 漏 userProfile 的老默认（上线前那个版本）
-    //   2) 3.18 第一次发版把 userProfile 放首位的错版（这次）
+    //   2) 3.18 第一次发版把 userProfile 放首位的错版
     // 只要用户动过顺序、或增删过任何卡片（增删常用卡片会让长度或内容
     // 偏离该列表），就原样保留，不覆盖用户配置。
+    // [Gamebox] 3.20 v2 回退：不按「元素集合相同」强制刷新顺序。
+    // 瀑布流的实际落位由卡片高度决定，用户装新包就会拿到新默认值，
+    // 无需覆盖持久化里的顺序（会破坏用户手动排的版）。
     if (system.isAndroid) {
       final currentMobile = props.mobileDashboardWidgets;
       if (_isLegacyAndroidDefaultDashboard(currentMobile) ||
