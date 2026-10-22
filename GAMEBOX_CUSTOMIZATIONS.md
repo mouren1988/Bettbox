@@ -6,7 +6,7 @@
 > 3. 提供完整的"同步上游 / rebase / 解决冲突"操作流程
 > 4. 任何修改都要带 `// [Gamebox]` 注释，并同步更新本文件
 
-**当前 `gamebox` 分支 HEAD**：`337ea70f`（merge 了 `origin/main` v1.19.7 = `1fb8806f`；同步过程见 §3.20）
+**当前 `gamebox` 分支 HEAD**：`229b5883`（已推送到 `origin/gamebox`；merge 了 `origin/main` v1.19.7 = `1fb8806f`，同步过程见 §3.20）
 **当前 `main` 分支 HEAD**：`1fb8806f`（严格等于 `upstream/main`，**不可变**）
 **当前发布版本**：`pubspec.yaml` = `1.19.7+2026102201`；`version.json` = `1.19.6+2026101601`（⚠️ **两者不一致，发版前要同步**，见 §8.4）
 **当前发布时间**：`2026-10-20`
@@ -1045,14 +1045,16 @@ flutter analyze --no-pub
 `build_runner` 会同时吃到：Gamebox 的默认值（`tun.enable=true`、`disableIcmpForwarding=false`、`enableHighPriority=true`、`disclaimerAccepted=true`）
 和上游新加的字段（`Tun.dnsMode`、`AppSettingProps.backupPassword`），不需要手工取舍。
 
-#### 本次验证结果
+#### 本次验证结果（2026-10-23 更新，登录窗/路径/回环保护三项修复后重新核对）
 
 | 项 | 结果 |
 |---|---|
 | `git diff --diff-filter=U` | 0（无未解决冲突） |
 | **`core/` vs 上游** | **完全一致（1096 文件逐字节相同）→ 内核已同步到 v1.19.33** |
-| `flutter analyze` | **0 error**（4 warning 是合并前就有的：`window.dart` 未用 import/变量、`controller.dart` 重复 import/未用变量）|
-| `flutter test` | 15 failing（合并**前**同分支是 28 failing → 上游顺带修好了 13 个，本次无新增失败）|
+| `flutter analyze` | **0 error** / **4 warning**（与基线一致：`window.dart` 未用 import/变量、`controller.dart` 重复 import/未用变量）|
+| `flutter test` | **13 failing**（修 `AppPath.downloadDir` 前是 **16 failing** → 该修复顺带救回 3 个被未捕获异常连累的既有测试）|
+| 新增回归测试 | `test/views/panel_login_layout_test.dart`（4 条）、`test/common/app_path_download_dir_test.dart`（1 条），全过 |
+| `main` vs `upstream/main` | **完全一致**（`1fb8806f` / `1fb8806f`，0-0）；已 `git fetch upstream main` 刷新过引用 |
 | `[Gamebox]` 标记总数 | 225 |
 | 42 项定制逐项比对（合并前 vs 合并后）| **38 项 INTACT，0 项 LOST** |
 
@@ -1263,6 +1265,25 @@ dart run windows/packaging/exe/package_windows.dart --arch amd64 --compatible
 # 6. 验证 version.json 同步(notes 跟 version 一致)
 #    访问 https://raw.githubusercontent.com/mouren1988/Bettbox/refs/heads/gamebox/version.json
 ```
+
+**⚠️ `version.json` 会被 CI 自动改写（2026-10-23 踩到）**
+
+- `version.json` 由 CI 自动提交，本地经常和远程不一致。
+- 实际遇到：`git push` 前发现 `origin/gamebox` 比本地多 2 个
+  `Update version.json` 提交，导致**无法 fast-forward**（分叉，需 merge）。
+  两个提交只动 `version.json`，且内容与本地等价（仅 BOM/CRLF 差异）。
+- **处理方式**：`git merge origin/gamebox --no-edit`，用 `ort` 策略干净合入、无冲突。
+- **建议 push 前固定先跑一遍**：
+
+```bash
+git fetch origin gamebox
+git log --oneline HEAD..origin/gamebox      # 有输出就先 merge，别硬推
+git rev-list --count HEAD..origin/gamebox   # >0 就是远程有新提交
+git merge-base --is-ancestor origin/gamebox HEAD && echo "可 fast-forward" || echo "已分叉，需先 merge"
+```
+
+> 上面第 6 步的验证也说明：发版时应**先本地 bump 再 push**，
+> 否则会被 CI 的自动提交覆盖，出现"推上去的版本号又变回去"。
 
 ### 8.5 测试
 
