@@ -59,23 +59,29 @@ class _PanelLoginGateState extends State<PanelLoginGate> {
                       ? (_) => windowManager.startDragging()
                       : null,
                   child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: _changePassword
-                          ? _PanelChangePasswordDialog(
-                              username: _username,
-                              embedded: true,
-                              onClose: () =>
-                                  setState(() => _changePassword = false),
-                            )
-                          : _PanelLoginForm(
-                              onChangePassword: (name) {
-                                setState(() {
-                                  _username = name;
-                                  _changePassword = true;
-                                });
-                              },
-                            ),
+                    // [Gamebox] 桌面端 MaterialScrollBehavior 会给滚动视图自动套 Scrollbar，
+                    // 登录小窗右侧就多出一条常驻的上下拖动条。这里换成 HiddenBarScrollBehavior
+                    // 只藏滚动条，滚动能力保留（小窗高度不够时表单仍能滚）。
+                    child: ScrollConfiguration(
+                      behavior: HiddenBarScrollBehavior(),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: _changePassword
+                            ? _PanelChangePasswordDialog(
+                                username: _username,
+                                embedded: true,
+                                onClose: () =>
+                                    setState(() => _changePassword = false),
+                              )
+                            : _PanelLoginForm(
+                                onChangePassword: (name) {
+                                  setState(() {
+                                    _username = name;
+                                    _changePassword = true;
+                                  });
+                                },
+                              ),
+                      ),
                     ),
                   ),
                 ),

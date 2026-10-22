@@ -714,6 +714,7 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 | `PanelLoginGate` 布局 | `Stack + Positioned(置顶/最小化/关闭)`,`Padding(top:28)` 套表单 | `Stack(Column(顶 28px window drag \| Expanded(GestDetector for drag + Center + SingleChildScrollView 内填表单)) + Positioned(右上角 _LoginWindowButtons))`,登录卡在窗口内水平+垂直居中；**按钮保留但只在桌面端画** |
 | `_LoginWindowButtons` widget | 3 个 IconButton(置顶/最小化/关闭)覆盖在登录卡右上角 | **保留并恢复**,但整体用 `system.isDesktop` 包住 —— 桌面端显示,Android/移动端不构建 |
 | 登录页 window drag | 两处 `GestureDetector(onPanStart: startDragging)` 无条件调用 | 用同一个 `showWindowButtons` 条件化:移动端 `onPanStart: null`(见下方 2026-10-23 修正) |
+| 登录页右侧滚动条 | `SingleChildScrollView` 在桌面端被 `MaterialScrollBehavior` 自动套 `Scrollbar`,小窗右侧常驻一条上下拖动条 | 外层包 `ScrollConfiguration(behavior: HiddenBarScrollBehavior())`——只藏滚动条,滚动能力保留(见下方 2026-10-23 修正) |
 | `lib/controller.dart` profile 默认名 | `profile?.label ?? 'Bettbox'` | 保留（无 fallback 时 fallback,非用户可见字符串） |
 | Toast 用户可见 | `Bettbox Connected` / `Bettbox Suspended` | 已改为 `Gamebox Connected` / `Gamebox Suspended` |
 | 包名 `com.appshub.bettbox.*`、类名 `BettboxService`/`BettboxVpnService`/`BettboxApplication`、window class `GAMEBOX_RUNNER_WIN32_WINDOW`、AUMID `Appshub.Gamebox`、URL scheme `bettbox://` | — | **未动**（这些都不是用户面向的显示文字,改包名是超大工程且要动签名/桌面快捷方式/卸载残留清理） |
@@ -745,6 +746,13 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 - **同时修掉的隐患**:两处 `onPanStart: windowManager.startDragging()` 原来是无条件调用,
   而 `PanelLoginGate` 在 Android 上**也会渲染**(`application.dart` 的 `_AppHome` 只按 `panelUnlocked` 分支,不判平台),
   移动端调 `windowManager` 是无意义的。现已用同一个 `showWindowButtons` 条件化,移动端传 `onPanStart: null`。
+- **再修一处(同批)**:登录小窗右侧那条**常驻上下拖动条**也去掉了。
+  根因是 `application.dart` 全局用了 `scrollBehavior: BaseScrollBehavior()`(继承 `MaterialScrollBehavior`),
+  桌面端 `MaterialScrollBehavior.buildScrollbar` 会给 `SingleChildScrollView` 自动套 `Scrollbar`。
+  修法:该 `SingleChildScrollView` 外层包 `ScrollConfiguration(behavior: HiddenBarScrollBehavior())`
+  (`lib/common/scroll.dart` 已有现成的,`buildScrollbar` 直接 `return child`)。
+  **滚动能力保留**(小窗高度不够时表单仍能滚,桌面端鼠标滚轮也能滚,因为 `HiddenBarScrollBehavior`
+  继承 `BaseScrollBehavior`,`dragDevices` 含 `PointerDeviceKind.mouse`)。
 - **以后改这块的规则**:**平台差异一律用 `system.isDesktop` / `system.isWindows` 就地条件化,
   不要用「删掉整个 widget」来隐藏某个平台的东西** —— 删了会连带影响其他平台。
 
@@ -1157,6 +1165,7 @@ flutter build windows --release --dart-define=APP_ENV=stable --no-pub
 2. 冷启动小窗右上角有「置顶/最小化/关闭」三个按钮（桌面端），
    点 X 能彻底退出（不留 gamebox + clash 内核残留进程）
 2b. 顶部 28px 区域可拖动窗口；安卓端这三个按钮与拖动都不出现
+2c. 登录小窗右侧没有常驻的上下滚动条（内容仍可滚）
 2. 登录后看到首页（`HomePage`）
 3. 侧边栏/悬浮面板**没有**「备份与恢复」入口
 4. 设置 → 关于页是 **Gamebox** 而不是 Bettbox
