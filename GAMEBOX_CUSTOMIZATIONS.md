@@ -8,7 +8,7 @@
 
 **当前 `gamebox` 分支 HEAD**：`229b5883`（已推送到 `origin/gamebox`；merge 了 `origin/main` v1.19.7 = `1fb8806f`，同步过程见 §3.20）
 **当前 `main` 分支 HEAD**：`1fb8806f`（严格等于 `upstream/main`，**不可变**）
-**当前发布版本**：`pubspec.yaml` = `1.19.7+2026102201`；`version.json` = `1.19.6+2026101601`（⚠️ **两者不一致，发版前要同步**，见 §8.4）
+**当前发布版本**：`pubspec.yaml` = `1.19.7+2026102201`；`version.json` = `1.19.7+2026102201`（✅ **已同步**，2026-10-23）
 **当前发布时间**：`2026-10-20`
 
 ---
@@ -1051,12 +1051,33 @@ flutter analyze --no-pub
 |---|---|
 | `git diff --diff-filter=U` | 0（无未解决冲突） |
 | **`core/` vs 上游** | **完全一致（1096 文件逐字节相同）→ 内核已同步到 v1.19.33** |
-| `flutter analyze` | **0 error** / **4 warning**（与基线一致：`window.dart` 未用 import/变量、`controller.dart` 重复 import/未用变量）|
+| `flutter analyze` | **0 error** / **4 warning**（与基线一致，详见下方「4 个 warning 明细」）|
 | `flutter test` | **13 failing**（修 `AppPath.downloadDir` 前是 **16 failing** → 该修复顺带救回 3 个被未捕获异常连累的既有测试）|
 | 新增回归测试 | `test/views/panel_login_layout_test.dart`（4 条）、`test/common/app_path_download_dir_test.dart`（1 条），全过 |
 | `main` vs `upstream/main` | **完全一致**（`1fb8806f` / `1fb8806f`，0-0）；已 `git fetch upstream main` 刷新过引用 |
 | `[Gamebox]` 标记总数 | 225 |
 | 42 项定制逐项比对（合并前 vs 合并后）| **38 项 INTACT，0 项 LOST** |
+
+#### 4 个 warning 明细（长期基线，非 Gamebox 引入）
+
+`flutter analyze` 的 **0 error / 4 warning** 是**合并上游 v1.19.7 前就存在**的基线状态，
+全部是"没用的东西"，不影响运行。逐条列一下，免得每次同步都要重新查：
+
+| # | 位置 | 类型 | 内容 |
+|---|---|---|---|
+| 1 | `lib/common/window.dart:3:8` | `unused_import` | `dart:math` 没用到 |
+| 2 | `lib/common/window.dart:105:11` | `unused_local_variable` | `showAsMainWindow()` 里的 `final props = globalState.config.windowProps;` 取了但没用 |
+| 3 | `lib/controller.dart:34:8` | `duplicate_import` | 同一个库被 import 了两次 |
+| 4 | `lib/controller.dart:1234:13` | `unused_local_variable` | `final submits = utils.parseReleaseBody(body);` 取了但没用 |
+
+- #2 有上下文：紧邻的注释写明"主界面永远用上游默认尺寸 910x620，不读 props"，
+  所以 `props` 是**故意留下又没删干净**的残留。
+- #4 同理：`submits` 解析结果已不再用于渲染（大字改显示 `notes` 内容，见该处 `[Gamebox]` 注释）。
+- 另有若干 `info` 级提示（`avoid_print`、`depend_on_referenced_packages`）**不计入**这 4 个，
+  它们来自上游代码与测试文件，未纳入基线统计。
+
+> ⚠️ **不要为了"清零 warning"去动 #1~#4**：它们是上游代码，
+> 下次同步上游若改了同一处，手工清理容易产生冲突。真要清就集中清一次并记录在此。
 
 #### 内核同步核对（Mihomo v1.19.33）
 
@@ -1266,12 +1287,15 @@ dart run windows/packaging/exe/package_windows.dart --arch amd64 --compatible
 #    访问 https://raw.githubusercontent.com/mouren1988/Bettbox/refs/heads/gamebox/version.json
 ```
 
-**⚠️ `version.json` 会被 CI 自动改写（2026-10-23 踩到）**
+**⚠️ `version.json` 是你手工维护的，push 前先看远程有没有新提交（2026-10-23 踩到）**
 
-- `version.json` 由 CI 自动提交，本地经常和远程不一致。
-- 实际遇到：`git push` 前发现 `origin/gamebox` 比本地多 2 个
-  `Update version.json` 提交，导致**无法 fast-forward**（分叉，需 merge）。
-  两个提交只动 `version.json`，且内容与本地等价（仅 BOM/CRLF 差异）。
+- `version.json` **不是 CI 自动生成的**（`.github/workflows/build.yaml` 里没有任何地方写它；
+  上游 `appshubcc/Bettbox` 仓库里也**根本没有这个文件**，它是 Gamebox 自有的）。
+  它由**仓库作者手工提交**，作为「检查更新」的数据源
+  （`lib/common/constant.dart` 的 `updateCheckUrl` 读 fork 分支上的这个文件）。
+- 实际遇到：push 前发现 `origin/gamebox` 比本地多 2 个 `Update version.json` 提交
+  （作者 MouRen / 2026-10-20），导致**无法 fast-forward**（分叉，硬推会被拒）。
+  那两个提交只动 `version.json`，内容与本地等价（仅 BOM/CRLF 差异）。
 - **处理方式**：`git merge origin/gamebox --no-edit`，用 `ort` 策略干净合入、无冲突。
 - **建议 push 前固定先跑一遍**：
 
@@ -1282,8 +1306,13 @@ git rev-list --count HEAD..origin/gamebox   # >0 就是远程有新提交
 git merge-base --is-ancestor origin/gamebox HEAD && echo "可 fast-forward" || echo "已分叉，需先 merge"
 ```
 
-> 上面第 6 步的验证也说明：发版时应**先本地 bump 再 push**，
-> 否则会被 CI 的自动提交覆盖，出现"推上去的版本号又变回去"。
+- **发版顺序**：必须**先本地 bump `version.json` 再 push**。
+  `utils.compareVersions` 是拿远端 `version.json` 跟本地
+  `packageInfo.version+buildNumber` 比（`lib/common/request.dart:checkForUpdate`），
+  版本号不完全一致会导致误报/漏报更新。
+- **注意**：仓库里的 `version.json` 带 **UTF-8 BOM + CRLF**，而 `core.autocrlf=false`，
+  所以**不要用会重写整文件的方式改它**（例如某些编辑器/脚本"保存即规范化"），
+  否则会凭空产生一个只改编码的噪音 diff。改完请 `git diff` 确认只有版本号两行变化。
 
 ### 8.5 测试
 
