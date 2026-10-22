@@ -59,30 +59,26 @@ class _PanelLoginGateState extends State<PanelLoginGate> {
                       ? (_) => windowManager.startDragging()
                       : null,
                   child: Center(
-                    // [Gamebox] 桌面端 MaterialScrollBehavior 会给滚动视图自动套 Scrollbar，
-                    // 登录小窗右侧就多出一条常驻的上下拖动条。这里换成 HiddenBarScrollBehavior
-                    // 只藏滚动条，滚动能力保留（小窗高度不够时表单仍能滚）。
-                    child: ScrollConfiguration(
-                      behavior: HiddenBarScrollBehavior(),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: _changePassword
-                            ? _PanelChangePasswordDialog(
-                                username: _username,
-                                embedded: true,
-                                onClose: () =>
-                                    setState(() => _changePassword = false),
-                              )
-                            : _PanelLoginForm(
-                                onChangePassword: (name) {
-                                  setState(() {
-                                    _username = name;
-                                    _changePassword = true;
-                                  });
-                                },
-                              ),
-                      ),
-                    ),
+                    // [Gamebox] 登录小窗固定 360x420，内容不允许滚动。
+                    // 桌面端 MaterialScrollBehavior 会给 SingleChildScrollView 自动套 Scrollbar，
+                    // 右侧那条常驻拖动条就是这么来的；而且表单实测要 452px 高
+                    // (viewport 只有 392px)，滚也滚不全。
+                    // 所以这里根本不放滚动视图，靠压缩间距让内容正好放进小窗。
+                    child: _changePassword
+                        ? _PanelChangePasswordDialog(
+                            username: _username,
+                            embedded: true,
+                            onClose: () =>
+                                setState(() => _changePassword = false),
+                          )
+                        : _PanelLoginForm(
+                            onChangePassword: (name) {
+                              setState(() {
+                                _username = name;
+                                _changePassword = true;
+                              });
+                            },
+                          ),
                   ),
                 ),
               ),
@@ -278,7 +274,9 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
     final scheme = context.colorScheme;
     final bothEmpty = _username.text.trim().isEmpty && _password.text.isEmpty;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(40, 40, 40, 40),
+      // [Gamebox] 登录小窗只有 360x420，去掉顶 28px 拖动条后可视高度 392px。
+      // 表单实测需要 452px，所以纵向留白压到 24/24；横向仍留 40（内容宽 280）。
+      padding: const EdgeInsets.fromLTRB(40, 24, 40, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -299,14 +297,14 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
               color: scheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           _field(
             controller: _username,
             hint: '用户名或邮箱',
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _field(
             controller: _password,
             hint: '密码',
@@ -314,7 +312,7 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
             onChanged: (_) => setState(() {}),
             onSubmitted: (_) => _submit(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Row(
             children: [
               _check(
@@ -347,7 +345,7 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           FilledButton.icon(
             // [Gamebox] 登录中保持按钮颜色，只把图标换成转圈，和 iGame 一样。
             onPressed: bothEmpty || _submitting ? null : _submit,
@@ -478,20 +476,20 @@ class _PanelChangePasswordDialogState
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _field(controller: _username, hint: '用户名或邮箱'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         _field(controller: _oldPassword, hint: '当前密码', obscure: true),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         _field(controller: _newPassword, hint: '新密码', obscure: true),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         _field(
           controller: _confirmPassword,
           hint: '确认新密码',
           obscure: true,
           onSubmitted: (_) => _submit(),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -524,7 +522,9 @@ class _PanelChangePasswordDialogState
     );
     if (widget.embedded) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(40, 48, 40, 40),
+        // [Gamebox] 嵌入登录小窗时同样要放进 392px 可视区：
+        // 顶部从 48 收到 24、底部 40 收到 24，配合下面的间距压缩共省 40px。
+        padding: const EdgeInsets.fromLTRB(40, 24, 40, 24),
         child: form,
       );
     }
@@ -663,7 +663,9 @@ Widget _field({
     decoration: InputDecoration(
       hintText: hint,
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      // [Gamebox] 登录小窗高度紧张，输入框内容边距从 14 收到 12，
+      // 两个输入框共省 8px（配合其它间距压缩正好放进 392px 可视区）。
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
   );
 }
