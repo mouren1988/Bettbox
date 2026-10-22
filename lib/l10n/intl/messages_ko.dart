@@ -794,7 +794,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "서버에 연결할 수 없습니다",
     ),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "다른 기기에서 연결할 수 없다면 시스템 방화벽에서 Bettbox 코어의 수신 연결을 허용하세요.",
+      "다른 기기에서 연결할 수 없다면 시스템 방화벽에서 Gamebox 코어의 수신 연결을 허용하세요.",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -818,7 +818,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfRunning": MessageLookupByLibrary.simpleMessage("테스트 중"),
     "iperfScan": MessageLookupByLibrary.simpleMessage("스캔하여 연결"),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "다른 기기의 Bettbox로 스캔하면 바로 연결됩니다",
+      "다른 기기의 Gamebox로 스캔하면 바로 연결됩니다",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "iPerf3 연결 QR 코드가 아닙니다",
@@ -1192,9 +1192,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "options": MessageLookupByLibrary.simpleMessage("옵션"),
     "organizationDomain": MessageLookupByLibrary.simpleMessage("조직 / 도메인"),
     "other": MessageLookupByLibrary.simpleMessage("기타"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage(
-      "기타 기여자 (무작위 정렬)",
-    ),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("기여자"),
     "otherSettings": MessageLookupByLibrary.simpleMessage("향상된 도구"),
     "otherSettingsDesc": MessageLookupByLibrary.simpleMessage("향상된 도구 설정 수정"),
     "outboundMode": MessageLookupByLibrary.simpleMessage("아웃바운드 모드"),

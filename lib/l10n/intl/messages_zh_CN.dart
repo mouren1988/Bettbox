@@ -700,7 +700,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfErrorUdp": MessageLookupByLibrary.simpleMessage("UDP 握手失败，可能被防火墙拦截"),
     "iperfErrorUnreachable": MessageLookupByLibrary.simpleMessage("无法连接到服务器"),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "如果其他设备连接不上，请在系统防火墙中允许 Bettbox 内核的传入连接。",
+      "如果其他设备连接不上，请在系统防火墙中允许 Gamebox 内核的传入连接。",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -722,7 +722,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfRunning": MessageLookupByLibrary.simpleMessage("测试中"),
     "iperfScan": MessageLookupByLibrary.simpleMessage("扫码连接"),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "在另一台设备的 Bettbox 中扫码，即可一键连接",
+      "在另一台设备的 Gamebox 中扫码，即可一键连接",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "这不是 iPerf3 连接二维码",

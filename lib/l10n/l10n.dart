@@ -2895,10 +2895,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Other Contributors (Random Order)`
+  /// `Contributors`
   String get otherContributors {
     return Intl.message(
-      'Other Contributors (Random Order)',
+      'Contributors',
       name: 'otherContributors',
       desc: '',
       args: [],
@@ -8875,10 +8875,10 @@ class AppLocalizations {
     );
   }
 
-  /// `Scan with Bettbox on another device to connect in one tap`
+  /// `Scan with Gamebox on another device to connect in one tap`
   String get iperfScanHint {
     return Intl.message(
-      'Scan with Bettbox on another device to connect in one tap',
+      'Scan with Gamebox on another device to connect in one tap',
       name: 'iperfScanHint',
       desc: '',
       args: [],
@@ -8940,10 +8940,10 @@ class AppLocalizations {
     );
   }
 
-  /// `If other devices can't connect, allow incoming connections for the Bettbox core in your system firewall.`
+  /// `If other devices can't connect, allow incoming connections for the Gamebox core in your system firewall.`
   String get iperfFirewallTip {
     return Intl.message(
-      'If other devices can\'t connect, allow incoming connections for the Bettbox core in your system firewall.',
+      'If other devices can\'t connect, allow incoming connections for the Gamebox core in your system firewall.',
       name: 'iperfFirewallTip',
       desc: '',
       args: [],

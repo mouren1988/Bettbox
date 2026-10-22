@@ -708,7 +708,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfErrorUdp": MessageLookupByLibrary.simpleMessage("UDP 交握失敗，可能被防火牆攔截"),
     "iperfErrorUnreachable": MessageLookupByLibrary.simpleMessage("無法連線到伺服器"),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "如果其他裝置無法連線，請在系統防火牆中允許 Bettbox 核心的傳入連線。",
+      "如果其他裝置無法連線，請在系統防火牆中允許 Gamebox 核心的傳入連線。",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -730,7 +730,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfRunning": MessageLookupByLibrary.simpleMessage("測試中"),
     "iperfScan": MessageLookupByLibrary.simpleMessage("掃碼連線"),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "在另一台裝置的 Bettbox 中掃碼，即可一鍵連線",
+      "在另一台裝置的 Gamebox 中掃碼，即可一鍵連線",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "這不是 iPerf3 連線 QR 碼",
@@ -1076,7 +1076,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "options": MessageLookupByLibrary.simpleMessage("選項"),
     "organizationDomain": MessageLookupByLibrary.simpleMessage("組織 / 域名"),
     "other": MessageLookupByLibrary.simpleMessage("其他"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage("其他貢獻者(隨機排序)"),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("贡献者"),
     "otherSettings": MessageLookupByLibrary.simpleMessage("增強工具"),
     "otherSettingsDesc": MessageLookupByLibrary.simpleMessage("修改增強工具設定"),
     "outboundMode": MessageLookupByLibrary.simpleMessage("出站模式"),

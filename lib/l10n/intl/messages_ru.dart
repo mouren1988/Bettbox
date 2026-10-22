@@ -985,7 +985,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Не удаётся связаться с сервером",
     ),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "Если другие устройства не могут подключиться, разрешите входящие подключения для ядра Bettbox в брандмауэре.",
+      "Если другие устройства не могут подключиться, разрешите входящие подключения для ядра Gamebox в брандмауэре.",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -1011,7 +1011,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Сканировать для подключения",
     ),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "Отсканируйте в Bettbox на другом устройстве, чтобы подключиться одним касанием",
+      "Отсканируйте в Gamebox на другом устройстве, чтобы подключиться одним касанием",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "Это не QR-код подключения iPerf3",
@@ -1475,9 +1475,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Организация / Домен",
     ),
     "other": MessageLookupByLibrary.simpleMessage("Другое"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage(
-      "Другие участники (в случайном порядке)",
-    ),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("Участники"),
     "otherSettings": MessageLookupByLibrary.simpleMessage(
       "Расширенные инструменты",
     ),

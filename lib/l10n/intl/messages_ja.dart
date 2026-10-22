@@ -782,7 +782,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "サーバーに接続できません",
     ),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "他のデバイスから接続できない場合は、システムのファイアウォールで Bettbox コアの受信接続を許可してください。",
+      "他のデバイスから接続できない場合は、システムのファイアウォールで Gamebox コアの受信接続を許可してください。",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -806,7 +806,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfRunning": MessageLookupByLibrary.simpleMessage("テスト中"),
     "iperfScan": MessageLookupByLibrary.simpleMessage("スキャンして接続"),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "別のデバイスの Bettbox でスキャンするとワンタップで接続できます",
+      "別のデバイスの Gamebox でスキャンするとワンタップで接続できます",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "iPerf3 の接続用 QR コードではありません",
@@ -1184,7 +1184,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "options": MessageLookupByLibrary.simpleMessage("オプション"),
     "organizationDomain": MessageLookupByLibrary.simpleMessage("組織 / ドメイン"),
     "other": MessageLookupByLibrary.simpleMessage("その他"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage("その他の貢献者（ランダム順）"),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("貢献者"),
     "otherSettings": MessageLookupByLibrary.simpleMessage("拡張ツール"),
     "otherSettingsDesc": MessageLookupByLibrary.simpleMessage("拡張ツールの設定を変更"),
     "outboundMode": MessageLookupByLibrary.simpleMessage("アウトバウンドモード"),

@@ -956,7 +956,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "دسترسی به سرور ممکن نیست",
     ),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "اگر دستگاه‌های دیگر نمی‌توانند وصل شوند، اتصال‌های ورودی هستهٔ Bettbox را در دیوارهٔ آتش سیستم مجاز کنید.",
+      "اگر دستگاه‌های دیگر نمی‌توانند وصل شوند، اتصال‌های ورودی هستهٔ Gamebox را در دیوارهٔ آتش سیستم مجاز کنید.",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -980,7 +980,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfRunning": MessageLookupByLibrary.simpleMessage("در حال آزمون"),
     "iperfScan": MessageLookupByLibrary.simpleMessage("اسکن برای اتصال"),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "با Bettbox در دستگاه دیگر اسکن کنید تا با یک لمس وصل شوید",
+      "با Gamebox در دستگاه دیگر اسکن کنید تا با یک لمس وصل شوید",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "این کد QR اتصال iPerf3 نیست",
@@ -1446,9 +1446,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "سازمان / دامنه",
     ),
     "other": MessageLookupByLibrary.simpleMessage("سایر"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage(
-      "مشارکت‌کنندگان دیگر (ترتیب تصادفی)",
-    ),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("مشارکت‌کنندگان"),
     "otherSettings": MessageLookupByLibrary.simpleMessage("ابزارهای پیشرفته"),
     "otherSettingsDesc": MessageLookupByLibrary.simpleMessage(
       "تغییر تنظیمات ابزارهای پیشرفته",

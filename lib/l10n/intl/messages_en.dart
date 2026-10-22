@@ -951,7 +951,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Can\'t reach the server",
     ),
     "iperfFirewallTip": MessageLookupByLibrary.simpleMessage(
-      "If other devices can\'t connect, allow incoming connections for the Bettbox core in your system firewall.",
+      "If other devices can\'t connect, allow incoming connections for the Gamebox core in your system firewall.",
     ),
     "iperfLostPackets": m16,
     "iperfNoAddress": MessageLookupByLibrary.simpleMessage(
@@ -975,7 +975,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "iperfRunning": MessageLookupByLibrary.simpleMessage("Testing"),
     "iperfScan": MessageLookupByLibrary.simpleMessage("Scan to connect"),
     "iperfScanHint": MessageLookupByLibrary.simpleMessage(
-      "Scan with Bettbox on another device to connect in one tap",
+      "Scan with Gamebox on another device to connect in one tap",
     ),
     "iperfScanInvalid": MessageLookupByLibrary.simpleMessage(
       "This isn\'t an iPerf3 connection QR code",
@@ -1429,9 +1429,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Organization / Domain",
     ),
     "other": MessageLookupByLibrary.simpleMessage("Other"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage(
-      "Other Contributors (Random Order)",
-    ),
+    "otherContributors": MessageLookupByLibrary.simpleMessage("Contributors"),
     "otherSettings": MessageLookupByLibrary.simpleMessage("Enhanced Tools"),
     "otherSettingsDesc": MessageLookupByLibrary.simpleMessage(
       "Modify enhanced tool settings",

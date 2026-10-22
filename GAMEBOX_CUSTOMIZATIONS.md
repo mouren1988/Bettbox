@@ -459,7 +459,15 @@ flutter analyze --no-pub
 | 当前 locale 显示 | `currentLocale` 强行落到 `_localeOptions` 唯一项（`_LocaleItem.build`）,保证 Radio 始终选中简体中文 | `lib/views/tools.dart` | `// [Gamebox] 即使 appSetting.locale 持久化的是老值...` |
 | 持久化兼容 | `appSetting.locale` 如果之前是 en/ja/... 不会被强行擦（防止破坏老用户偏好存储）| `lib/models/config.dart` | 沿用上游存储格式 |
 | `otherContributors` 文案 | 6 个 locale 的 arb 全部去掉「(随机排序)」/「(Random Order)」等尾巴;中文用「贡献者」| `arb/intl_*.arb` | 关于页只显示维护者,不再有「随机排序」误导 |
-| 关于页 `desc` | 缩短为「Gamebox 基于强大灵活的 Mihomo 内核深度打造,致力于更好的客户端体验。」（去掉「我们的愿景: Connecting Open Source and AI, Accelerating Innovation」英文尾巴）| `lib/l10n/intl/messages_zh_CN.dart` | intl_utils 自动重生成 |
+| 关于页 `desc` | 缩短为「Gamebox 基于强大灵活的 Mihomo 内核深度打造,致力于更好的客户端体验。」（去掉「我们的愿景: Connecting Open Source and AI, Accelerating Innovation」英文尾巴）| `arb/intl_zh_CN.arb` | intl_utils 自动重生成 |
+
+> 🐛 **坑：`arb/` 改了 ≠ 生效，`lib/l10n/` 也必须重新生成。**
+> 2026-10-23 核对 v1.19.7 时发现：`otherContributors` 和关于页 `desc` 这两项定制**只改了 arb，从没跑过
+> `dart run intl_utils:generate`** —— 合并前的 `lib/l10n/intl/messages_en.dart` 里仍然是
+> 上游原文 `"Other Contributors (Random Order)"`，也就是说这两条定制**写进了文档但实际从未生效**。
+> 本次重新生成后才真正生效（现已是 `"Contributors"`）。
+> **以后改任何 arb 文案，务必跟一次 `dart run intl_utils:generate` 并确认 `lib/l10n/` 有 diff**，
+> 否则改了个寂寞。
 
 **为什么这么做**：
 - 上游 `MaterialApp.locale` 写死 `zh-Hans-CN`（见 §3.1）,**选别的 locale 实际不生效**（下次冷启动被覆盖）
@@ -998,22 +1006,40 @@ Gamebox 对 `core/` **零定制** —— 内核是 in-tree vendored（仓库无 
 | 修复渲染引擎引起的桌面端兼容问题 | ✅ | 与 §3.14「Impeller 无条件禁」同向 —— 该项已按 v1.19.6/v1.19.7 上游写法无条件禁用 |
 | **新 Slogan "Better Network Toolbox"** | ⚠️ **仅文档，非 App UI** | 只存在于 `README.md` / `readme/README_*.md`。`readme/` 6 个语言文件与上游逐字节一致；根 `README.md` 因上游更新而被带入，仍写 "Bettbox"。**App 内没有任何 slogan 文案**，所以对用户无影响。按用户决定：**README 保持和上游一致，不改** |
 
-#### 已知残留的 "Bettbox" 用户可见文案（**均非本次合并引入**，是上游自己的）
+#### 用户可见 "Bettbox" 文案清理 ✅ 已完成
 
-跑了一遍全仓品牌审计（排除注释 / 包名 / URL / 技术标识符 / channel ID 之后），
-仍有 3 处用户能看到 "Bettbox"。已逐个比对确认**合并前后完全相同**（上游原样如此），不是合并弄丢的：
+跑全仓品牌审计（排除注释 / 包名 / URL / 技术标识符 / channel ID 之后）找出 3 处用户能看到 "Bettbox"，
+已逐个比对确认**合并前后完全相同**（上游原样如此，**不是合并弄丢的**），本次已全部改成 Gamebox：
 
-| 位置 | 文案 | 是否用户可见 | 处置 |
-|---|---|---|---|
-| `arb/intl_*.arb`（7 语言 ×2 条）| `iperfScanHint` / `iperfFirewallTip`（iPerf3 工具提示里提到 "Bettbox"）| ✅ **是**，工具箱 iPerf 页可见 | 待定：想改就把 7 个 arb 里的 "Bettbox" → "Gamebox" 后跑 `intl_utils` 重生成 |
-| `lib/views/profiles/tv_qr_import_dialog.dart` | Android TV 推送页 `title: 'Bettbox 配置推送'` | ✅ **是**，TV 扫码导入弹窗标题 | 待定：改成 Gamebox |
-| `lib/main.dart:257` | `profile?.label ?? 'Bettbox'`（网速通知的兜底名）| ⚠️ 仅当 profile 没 label 时才用，正常路径看不到 | 可不改 |
-| `distribute_options.yaml` | `app_name: 'Bettbox'` | ❌ 打包用（Linux deb/rpm），Windows 安装器用的是 `make_config.yaml` 里的 Gamebox | 可不改 |
+| 位置 | 改动 |
+|---|---|
+| `arb/intl_*.arb`（7 语言 ×2 条）| `iperfScanHint` / `iperfFirewallTip` → Gamebox，并跑了 `dart run intl_utils:generate` 同步 `lib/l10n/` |
+| `lib/views/profiles/tv_qr_import_dialog.dart` | 4 处：`<title>`、`<h1>📺 </h1>`、zh `title`、en `title` |
+| `lib/main.dart:257` | `profile?.label ?? 'Bettbox'` → 仍保留（仅 profile 无 label 时的网速通知兜底名，正常路径不可见；改了反而和历史通知不一致）|
 
-> 其余 60+ 处 `Bettbox`/`bettbox` 全是**技术标识符**，不改是对的：
-> 包名 `com.appshub.bettbox.*`、URL scheme `bettbox://`、通知渠道 ID `Bettbox`/`Bettbox_High`/`Bettbox_Suspended`、
-> Unix socket 名、polkit 规则文件名、salt、`BettboxCore.exe` 二进制名、测试临时文件名等。
-> 见 §3.17「为什么 channel 名/ID 不一并改」。
+> ⚠️ `localStorage` 的 key `'bettbox_tv_lang'` **故意不改** —— 改了老用户 TV 端语言偏好会丢失，属技术标识符。
+
+剩余 `Bettbox`/`bettbox` 全部是**技术标识符，不该改**：
+包名 `com.appshub.bettbox.*`、URL scheme `bettbox://`、通知渠道 ID `Bettbox`/`Bettbox_High`/`Bettbox_Suspended`、
+Unix socket 名、polkit 规则文件名、salt、`BettboxCore.exe` 二进制名、`distribute_options.yaml`（Linux deb/rpm 打包用）、
+测试临时文件名。见 §3.17「为什么 channel 名/ID 不一并改」。
+
+#### 内核是怎么来的（不是复制上游便携版）
+
+**内核不是从上游便携版里"复制"来的，而是每次打包时用 Go 从 `core/` 源码树现场编译出来的。**
+
+| 环节 | 说明 |
+|---|---|
+| 源码来源 | `core/`（内含 vendored 的 `core/Clash.Meta`），随仓库一起 merge，**不是 submodule、不联网下载** |
+| 编译时机 | 打包时 `setup.dart` 调 `Build.buildCore()` → `go build`（`-tags` / `-trimpath` / `-ldflags`），产物落到 `libclash/<target>/<arch>/` |
+| 命名 | `Build.coreName = '${identityName}Core'` —— 靠 `AppIdentity` 参数化成 **`GameboxCore`**（上游是 `BettboxCore`），见 §3.16 |
+| 进包 | 桌面端 `appPath.bundledCorePath` 从可执行文件同目录取 `${coreExecutableName}.exe`；Linux AppImage 走 `ensureAppImageCoreSynced()` 拷到外部目录（带 `.core_stamp` 做 mtime/size 戳）|
+| 启动 | `lib/clash/service.dart` 用 `Process.start(appPath.corePath, ...)` 起**独立进程**（Windows 走 helper 服务的 `startCore`）；移动端才用 FFI `libmeta.so` |
+| 版本号 | 构建时 `-ldflags` 注入，源码里查不到（见上文 core 核对说明）|
+
+> 所以"内核是否同步到 v1.19.33"取决于**仓库里 `core/` 源码是否与上游一致**，
+> 只要 `git diff HEAD upstream/main -- core/` 为空，打出来的 `GameboxCore.exe` 就是 v1.19.33。
+> 反过来说，**不要从任何地方单独拷一个 `*Core.exe` 进仓库** —— 那会绕过源码、绕过 `-ldflags`、也过不了 §3.16 的命名检查。
 
 ---
 
