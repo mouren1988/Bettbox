@@ -1,4 +1,4 @@
-﻿// ignore_for_file: invalid_annotation_target
+// ignore_for_file: invalid_annotation_target
 
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
@@ -174,7 +174,7 @@ List<DashboardWidget> desktopDashboardWidgetsSafeFromJson(
   } catch (_) {
     widgets = defaultDashboardWidgets;
   }
-// [Gamebox] 旧配置里没有这张卡时，放在网络速度后面，和确认过的排版一致。
+  // [Gamebox] 旧配置里没有这张卡时，放在网络速度后面，和确认过的排版一致。
   if (!widgets.contains(DashboardWidget.userProfile)) {
     final next = List<DashboardWidget>.from(widgets);
     final index = next.indexOf(DashboardWidget.networkSpeed);
@@ -301,7 +301,7 @@ abstract class AppSettingProps with _$AppSettingProps {
     @Default(true) bool keepDockIcon,
     @Default(false) bool developerMode,
     @Default(RecoveryStrategy.compatible) RecoveryStrategy recoveryStrategy,
-// ↑ upstream v1.19.7 新增：备份密码（Gamebox 隐藏了备份入口，但字段保留以兼容 upstream 数据结构）
+    // ↑ upstream v1.19.7 新增：备份密码（Gamebox 隐藏了备份入口，但字段保留以兼容 upstream 数据结构）
     @Default('') String backupPassword,
     // [Gamebox] 增强工具 > 高优先级默认开启。上游默认 false。同步时保留 true。
     @Default(true) bool enableHighPriority,
@@ -475,7 +475,11 @@ abstract class VpnProps with _$VpnProps {
     @Default('') String smartAutoStopNetworks,
     @Default(false) bool storeFix,
     @Default(false) bool networkFix,
-    @Default(true) bool loopbackProtection,
+    // [Gamebox] 回环保护默认关闭（与上游一致，所有平台统一）。
+    // 上游 1.19.7 的 VpnProps.loopbackProtection 默认就是 false；
+    // Gamebox 之前改成 true 会额外注入两条 REJECT 规则，
+    // 把本机 127.0.0.0/8 / ::1 到内核监听端口的流量全部拒掉。
+    @Default(false) bool loopbackProtection,
     @Default(false) bool disableQuic,
     @Default(true) bool highPriorityNotification,
     @Default(true) bool networkSpeedNotification,

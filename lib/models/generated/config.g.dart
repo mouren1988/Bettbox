@@ -386,7 +386,7 @@ _VpnProps _$VpnPropsFromJson(Map<String, dynamic> json) => _VpnProps(
   smartAutoStopNetworks: json['smartAutoStopNetworks'] as String? ?? '',
   storeFix: json['storeFix'] as bool? ?? false,
   networkFix: json['networkFix'] as bool? ?? false,
-  loopbackProtection: json['loopbackProtection'] as bool? ?? true,
+  loopbackProtection: json['loopbackProtection'] as bool? ?? false,
   disableQuic: json['disableQuic'] as bool? ?? false,
   highPriorityNotification: json['highPriorityNotification'] as bool? ?? true,
   networkSpeedNotification: json['networkSpeedNotification'] as bool? ?? true,

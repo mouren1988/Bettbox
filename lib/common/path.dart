@@ -47,9 +47,58 @@ class AppPath {
         tempDir.complete(value);
       });
     }
-    getDownloadsDirectory().then((value) {
-      downloadDir.complete(value);
-    });
+    _resolveDownloadDir();
+  }
+
+  // [Gamebox] 解析「下载目录」，并保证**一定成功**。
+  //
+  // 背景：getDownloadsDirectory() 只有 macOS 平台实现，其它平台
+  // (Windows / Linux / Android) 的 MethodChannelPathProvider.getDownloadsPath()
+  // 会直接抛 UnsupportedError('Functionality only available on macOS')。
+  // 原代码无条件调用且没接错误，导致两个问题：
+  //   1. 非 macOS 上后台一直抛未捕获异常；
+  //   2. downloadDir 这个 Completer 永远不 complete，而 picker 用
+  //      `await appPath.downloadDirPath` 决定文件对话框的默认目录，
+  //      一旦走到那里就会永久等待 → 对话框卡住不出。
+  //
+  // 现在按平台取值，并加兜底，保证这个 Completer 一定会完成：
+  //   - macOS   : 真正的「下载」目录
+  //   - Windows : %USERPROFILE%\Downloads（可被 OneDrive 重定向，不存在就退回文档目录）
+  //   - 其它    : 文档 / 应用支持目录
+  Future<void> _resolveDownloadDir() async {
+    Directory? resolved;
+    if (system.isMacOS) {
+      try {
+        resolved = await getDownloadsDirectory();
+      } catch (_) {
+        // 落到下面的兜底。
+      }
+    }
+    resolved ??= await _fallbackDownloadDir().timeout(
+      // 通道无响应时不能把调用方一起拖死。
+      const Duration(seconds: 3),
+      onTimeout: () => null,
+    );
+    // 兜底的兜底：systemTemp 一定存在。
+    resolved ??= Directory.systemTemp;
+    if (!resolved.existsSync()) resolved = Directory.systemTemp;
+    if (!downloadDir.isCompleted) downloadDir.complete(resolved);
+  }
+
+  Future<Directory?> _fallbackDownloadDir() async {
+    try {
+      if (system.isWindows) {
+        final home = Platform.environment['USERPROFILE'];
+        if (home != null && home.isNotEmpty) {
+          final dir = Directory(join(home, 'Downloads'));
+          // 下载目录常被重定向到 OneDrive 等位置，只在确实存在时才用它。
+          if (dir.existsSync()) return dir;
+        }
+      }
+      return await getApplicationDocumentsDirectory();
+    } catch (_) {
+      return null;
+    }
   }
 
   factory AppPath() {
@@ -188,7 +237,12 @@ class AppPath {
   }
 
   Future<String> get downloadDirPath async {
-    final directory = await downloadDir.future;
+    // [Gamebox] _resolveDownloadDir() 保证一定会 complete，这里再加一道
+    // 超时兜底：文件选择框的默认目录不值得让它把调用方永远挂住。
+    final directory = await downloadDir.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => Directory.systemTemp,
+    );
     return directory.path;
   }
 

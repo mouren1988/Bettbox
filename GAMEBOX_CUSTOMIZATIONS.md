@@ -716,6 +716,8 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 | 登录页 window drag | 两处 `GestureDetector(onPanStart: startDragging)` 无条件调用 | 用同一个 `showWindowButtons` 条件化:移动端 `onPanStart: null`(见下方 2026-10-23 修正) |
 | 登录页右侧滚动条 | `SingleChildScrollView` 在桌面端被 `MaterialScrollBehavior` 自动套 `Scrollbar`,小窗右侧常驻一条上下拖动条 | **删除 `SingleChildScrollView`,内容固定不滚动**;靠压缩间距让内容正好放进 392px 可视区(见下方 2026-10-23 修正) |
 | `lib/controller.dart` profile 默认名 | `profile?.label ?? 'Bettbox'` | 保留（无 fallback 时 fallback,非用户可见字符串） |
+| `VpnProps.loopbackProtection` 默认值 | `@Default(true)` | **`@Default(false)`,与上游 1.19.7 一致**(所有平台统一关闭,见下方 2026-10-23 修正) |
+| `AppPath` 的 `downloadDir` | 无条件 `getDownloadsDirectory()` 且不接错误 | 分平台解析 + 兜底,保证 Completer 一定完成(见下方 2026-10-23 修正) |
 | Toast 用户可见 | `Bettbox Connected` / `Bettbox Suspended` | 已改为 `Gamebox Connected` / `Gamebox Suspended` |
 | 包名 `com.appshub.bettbox.*`、类名 `BettboxService`/`BettboxVpnService`/`BettboxApplication`、window class `GAMEBOX_RUNNER_WIN32_WINDOW`、AUMID `Appshub.Gamebox`、URL scheme `bettbox://` | — | **未动**（这些都不是用户面向的显示文字,改包名是超大工程且要动签名/桌面快捷方式/卸载残留清理） |
 
@@ -772,6 +774,48 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
   `PathProviderPlatform.instance`。已在测试里用 `_FakePathProvider` 解决。
 - **⚠️ 以后加字段要留意**:登录小窗高度是硬约束 392px。往登录/改密码表单里加任何一行控件,
   都要重跑 `test/views/panel_login_layout_test.dart` 确认没超,否则会溢出。
+
+### 2026-10-23 回环保护默认值对齐上游
+
+- **现象**:上游(1.19.7)`VpnProps.loopbackProtection` 默认 **false**,Gamebox 之前改成了 `true`。
+- **影响**:该开关为 true 时,`lib/state.dart` 会往 `prepend-rules` 注入两条 REJECT 规则:
+
+  ```
+  AND,((DST-PORT,$listenPorts),(IP-CIDR,127.0.0.0/8,no-resolve)),REJECT
+  AND,((DST-PORT,$listenPorts),(IP-CIDR6,::1/128,no-resolve)),REJECT
+  ```
+
+  即**把本机 127.0.0.0/8 / ::1 访问内核监听端口的流量全部拒掉**。
+- **修改**:`lib/models/config.dart` 的 `@Default(true) bool loopbackProtection` → `@Default(false)`,
+  并跑 `dart run build_runner build` 重生成 `config.freezed.dart` / `config.g.dart`。
+- **作用范围**:`loopbackProtection` 是 `VpnProps` 里的通用字段,**不区分平台**,
+  所以改这一处就等于所有平台统一关闭,与上游一致。
+- **注意**:这只改**默认值**。已经装过旧版本的用户,本地配置里存的是 `true`,
+  升级后仍是开启状态,需要在「增加工具 → 回环保护」里手动关掉(或删配置重置)。
+  如需强制关闭,要在读取配置处做迁移,那是行为变更,本次没做。
+
+### 2026-10-23 修 `AppPath` 的 downloadDir 死等
+
+- **问题**:`AppPath` 构造时无条件调 `getDownloadsDirectory()`,但
+  `MethodChannelPathProvider.getDownloadsPath()` **只有 macOS 有实现**,其它平台
+  (Windows / Linux / Android)直接抛 `UnsupportedError('Functionality only available on macOS')`。
+  原代码用 `.then(...)` 且没接错误,导致:
+  1. 非 macOS 上后台一直抛未捕获异常;
+  2. `downloadDir` 这个 `Completer` **永远不 complete**,而
+     `lib/common/picker.dart` 用 `await appPath.downloadDirPath` 当文件对话框的默认目录,
+     一旦走到那里就**永久等待 → 对话框卡住**。
+- **修复**:抽出 `_resolveDownloadDir()`,分平台取值并保证一定完成:
+  - macOS → 真正的下载目录(失败则落到兜底)
+  - Windows → `%USERPROFILE%\Downloads`(常被重定向到 OneDrive,不存在就跳过)
+  - 其它/兜底 → 文档目录;再兜底 → `systemTemp`
+  - 全程 `.catchError` + 3 秒超时,绝不让 Completer 悬空
+  - `downloadDirPath` getter 再加 5 秒超时兜底
+- **回归测试**:`test/common/app_path_download_dir_test.dart`,用假的
+  `PathProviderPlatform` 让 `getDownloadsPath()` 抛异常(即模拟 Windows),
+  断言 `downloadDirPath` 在超时前能拿到值。
+  **已验证该测试能抓到这个 bug**:临时还原成旧写法后测试会 TimeoutException 失败。
+- **附带收益**:修完后 `flutter test` 的失败数从 **16 降到 13**,
+  说明有 3 个既有测试本来是被这个未捕获异常连累的。
 - **以后改这块的规则**:**平台差异一律用 `system.isDesktop` / `system.isWindows` 就地条件化,
   不要用「删掉整个 widget」来隐藏某个平台的东西** —— 删了会连带影响其他平台。
 
