@@ -711,8 +711,9 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 | 渠道 ID `NOTIFICATION_CHANNEL` 等 | 保留 `"Bettbox"` / `"Bettbox_High"` / `"Bettbox_Suspended"` | **保持不变**（内部技术键,改会导致旧用户重装时 channel 无法复用,造成系统通知设置里出现两个渠道） |
 | Android 12+ 启动 splash | `windowSplashScreenAnimatedIcon = @drawable/splash_text_light`（白底黑字"Bettbox"字形矢量图） | 删除该属性,splash 阶段只显示纯背景色（白/黑）→ 立刻交给 Flutter 接管 |
 | `drawable/splash_text_light.xml`、`drawable/splash_text_dark.xml` | 引用方已删除 | 一并物理删除文件 |
-| `PanelLoginGate` 布局 | `Stack + Positioned(置顶/最小化/关闭)`,`Padding(top:28)` 套表单 | `Column(顶 28px window drag | Expanded(GestDetector for drag + Center + SingleChildScrollView 内填表单))`,登录卡在窗口内水平+垂直居中；移除右上角 _LoginWindowButtons 后用户用 OS title bar / window drag 区域操作 |
-| `_LoginWindowButtons` widget | 3 个 IconButton(置顶/最小化/关闭)覆盖在登录卡右上角 | 整个类删除；helper `_icon` 也一并删除 |
+| `PanelLoginGate` 布局 | `Stack + Positioned(置顶/最小化/关闭)`,`Padding(top:28)` 套表单 | `Stack(Column(顶 28px window drag \| Expanded(GestDetector for drag + Center + SingleChildScrollView 内填表单)) + Positioned(右上角 _LoginWindowButtons))`,登录卡在窗口内水平+垂直居中；**按钮保留但只在桌面端画** |
+| `_LoginWindowButtons` widget | 3 个 IconButton(置顶/最小化/关闭)覆盖在登录卡右上角 | **保留并恢复**,但整体用 `system.isDesktop` 包住 —— 桌面端显示,Android/移动端不构建 |
+| 登录页 window drag | 两处 `GestureDetector(onPanStart: startDragging)` 无条件调用 | 用同一个 `showWindowButtons` 条件化:移动端 `onPanStart: null`(见下方 2026-10-23 修正) |
 | `lib/controller.dart` profile 默认名 | `profile?.label ?? 'Bettbox'` | 保留（无 fallback 时 fallback,非用户可见字符串） |
 | Toast 用户可见 | `Bettbox Connected` / `Bettbox Suspended` | 已改为 `Gamebox Connected` / `Gamebox Suspended` |
 | 包名 `com.appshub.bettbox.*`、类名 `BettboxService`/`BettboxVpnService`/`BettboxApplication`、window class `GAMEBOX_RUNNER_WIN32_WINDOW`、AUMID `Appshub.Gamebox`、URL scheme `bettbox://` | — | **未动**（这些都不是用户面向的显示文字,改包名是超大工程且要动签名/桌面快捷方式/卸载残留清理） |
@@ -734,6 +735,19 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 2. **打开应用瞬间有一闪而过的白底黑字 "Bettbox" 动画,再跳到登录界面** —— 这是 Android 12+ 的 SplashScreen 系统 API,读 `LaunchTheme` 的 `windowSplashScreenAnimatedIcon`,而该图标是两张矢量图(`splash_text_{light,dark}.xml`),`pathData` 是 "Bettbox" 字母的 vector outlines。Android 12 在主 Activity 起来前会强制 overlay 一段 splash,不显示就让 splash 完全消失
 3. **Android 登录界面整体不居中,右上角有 「置顶/最小化/关闭」三个 Windows 风格按钮** —— `PanelLoginGate` 用 Stack + Positioned 把这三个 IconButton 浮在登录卡右上角;卡片本体被 `Padding(top:28)` 顶上去没有水平居中约束。把栈拆成 Column + Center,顶部留 28px 给 window drag,登录卡在窗口内居中显示
 
+**⚠️ 2026-10-23 修正:上面的第 3 点只做了一半 —— Windows 的按钮被误删了**
+
+- **原委**:为了消掉 Android 上那三个 Windows 风格按钮,把 `_LoginWindowButtons` 整个类删了,
+  结果 **Windows 桌面端也跟着没了**置顶/最小化/关闭。用户反馈「安卓要隐藏、windows 要正常显示」。
+- **现状**:`_LoginWindowButtons` 与 helper `_icon` **已恢复**(与删除前逐行一致),
+  用 `system.isDesktop` 条件化渲染 —— `Positioned(top:0, right:0, child: _LoginWindowButtons())` 只在桌面端进树,
+  Android 上整个 widget 不构建,自然不会有按钮。
+- **同时修掉的隐患**:两处 `onPanStart: windowManager.startDragging()` 原来是无条件调用,
+  而 `PanelLoginGate` 在 Android 上**也会渲染**(`application.dart` 的 `_AppHome` 只按 `panelUnlocked` 分支,不判平台),
+  移动端调 `windowManager` 是无意义的。现已用同一个 `showWindowButtons` 条件化,移动端传 `onPanStart: null`。
+- **以后改这块的规则**:**平台差异一律用 `system.isDesktop` / `system.isWindows` 就地条件化,
+  不要用「删掉整个 widget」来隐藏某个平台的东西** —— 删了会连带影响其他平台。
+
 **为什么 channel 名/ID 不一并改**:
 
 - `setContentTitle("Bettbox")` 等渠道名(用户看到的)已改为 `Gamebox`,这部分是用户可见的
@@ -749,13 +763,13 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 
 - 渠道 ID 保留,Android 11- 老用户重装通知设置里不会出现重复渠道;Android 12+ 渠道名 "Gamebox ..." 显示正常
 - splash 阶段纯背景色 < 0.5 秒,Flutter 启动不会被明显拉长（系统 splash API 仍然在跑,只是不显示中央图标）
-- 登录页 `_LoginWindowButtons` 移除后,**Android 设备** 没影响（Android 屏幕最大化的应用本来就没这三键,PanelLoginGate 在 Android 上是全屏；这三键只对 Windows/Linux desktop 上的小型 login window 才有意义）；**Windows/Linux** 上用户可以通过 OS title bar 或顶部 28px drag 区拖窗口 / 最小化 / 关闭,功能没丢
+- 登录页按钮按平台条件化后,**Android 设备** 没影响（`system.isDesktop` 为 false,widget 不进树,拖动也置空）；**Windows/Linux** 上置顶/最小化/关闭三个按钮**照常显示**(2026-10-23 已恢复,此前被误删)
 - 包名、签名、桌面快捷方式、注册表 key (`Software\\Gamebox`、`CSIDL_DESKTOPDIRECTORY` lnk) 路径都保留,升级是同一图标+签名,无需卸载（与 1.19.6 自身更新路径一致）
 
 **rebase 注意点**:
 
 - upstream 如果新增通知渠道（VPN / service / suspended）代码块,**保留 `[Gamebox]` 标记**,`setContentTitle` / 渠道显示名 / Toast 文案都得是 "Gamebox"
-- upstream 如果调整 `PanelLoginGate` 布局,**不要再把 `_LoginWindowButtons` 拿回来**（用户已表态移除）
+- upstream 如果调整 `PanelLoginGate` 布局,**保留 `system.isDesktop` 的条件化**(桌面端显示按钮 + 拖动,移动端都不启用),不要退回「删掉 `_LoginWindowButtons`」的做法
 - upstream 如果启用 Android splash icon,**留空 `windowSplashScreenAnimatedIcon`** 或重新画图标,不要复用 `splash_text_light.xml`（上游也是把这 path 当字母 "Bettbox" 用的）
 - upstream 如果改 strings.xml 的 `bett_box` key 名,新版顺手把 value 也对齐 "Gamebox"
 
@@ -1140,6 +1154,9 @@ flutter build windows --release --dart-define=APP_ENV=stable --no-pub
 ### 8.3 验证清单（打包后必查）
 
 1. 冷启动看到登录小窗（`PanelLoginGate`）
+2. 冷启动小窗右上角有「置顶/最小化/关闭」三个按钮（桌面端），
+   点 X 能彻底退出（不留 gamebox + clash 内核残留进程）
+2b. 顶部 28px 区域可拖动窗口；安卓端这三个按钮与拖动都不出现
 2. 登录后看到首页（`HomePage`）
 3. 侧边栏/悬浮面板**没有**「备份与恢复」入口
 4. 设置 → 关于页是 **Gamebox** 而不是 Bettbox
@@ -1185,6 +1202,7 @@ flutter build windows --release --dart-define=APP_ENV=stable
 
 # 验证项
 # 1. 冷启动看到登录小窗（PanelLoginGate）
+# 1b. 右上角「置顶/最小化/关闭」三个按钮在（桌面端）；点 X 进程彻底退出
 # 2. 登录后看到首页（HomePage）
 # 3. 侧边栏/悬浮面板没有"备份与恢复"入口
 # 4. 设置 → 关于页是 Gamebox 而不是 Bettbox

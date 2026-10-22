@@ -7,7 +7,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
 // [Gamebox] 登录界面按 iGame 的面板登录页排。
-// 冷启动窗口本身就是这张卡片，不再套一层底色。最小化、关闭一直显示，不显示最大化。
+// 冷启动窗口本身就是这张卡片，不再套一层底色。
+// 窗口按钮只在桌面端画：置顶/最小化/关闭一直显示，不显示最大化。
+// Android 上这些按钮必须隐藏 —— windowManager 在移动端不可用，且安卓有自己的系统返回键。
 
 void showPanelChangePassword({String username = ''}) {
   globalState.showCommonDialog<void>(
@@ -29,50 +31,140 @@ class _PanelLoginGateState extends State<PanelLoginGate> {
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
+    // [Gamebox] 桌面端右上角放置顶/最小化/关闭。安卓端不画这三个按钮。
+    final showWindowButtons = system.isDesktop;
     return Material(
       color: scheme.surfaceContainerHigh,
       // [Gamebox] 顶部 28px 留给 window drag (登录小窗没有 OS title bar,
       // 没这块用户没办法从顶部往下拖动窗口)。其余空间内容居中显示。
-      child: Column(
+      child: Stack(
         children: [
-          SizedBox(
-            height: 28,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onPanStart: (_) => windowManager.startDragging(),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onPanStart: (_) => windowManager.startDragging(),
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: _changePassword
-                      ? _PanelChangePasswordDialog(
-                          username: _username,
-                          embedded: true,
-                          onClose: () => setState(
-                            () => _changePassword = false,
-                          ),
-                        )
-                      : _PanelLoginForm(
-                          onChangePassword: (name) {
-                            setState(() {
-                              _username = name;
-                              _changePassword = true;
-                            });
-                          },
-                        ),
+          Column(
+            children: [
+              SizedBox(
+                height: 28,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  // [Gamebox] 安卓端不能调 windowManager（移动端无此实现），
+                  // 且安卓有自己的系统返回键，不需要这套桌面窗口拖动。
+                  onPanStart: showWindowButtons
+                      ? (_) => windowManager.startDragging()
+                      : null,
                 ),
               ),
-            ),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onPanStart: showWindowButtons
+                      ? (_) => windowManager.startDragging()
+                      : null,
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: _changePassword
+                          ? _PanelChangePasswordDialog(
+                              username: _username,
+                              embedded: true,
+                              onClose: () =>
+                                  setState(() => _changePassword = false),
+                            )
+                          : _PanelLoginForm(
+                              onChangePassword: (name) {
+                                setState(() {
+                                  _username = name;
+                                  _changePassword = true;
+                                });
+                              },
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+          // [Gamebox] 叠在顶部拖动条右侧。按钮自己吃掉点击事件，不会触发拖动。
+          if (showWindowButtons)
+            const Positioned(top: 0, right: 0, child: _LoginWindowButtons()),
         ],
       ),
     );
   }
+}
+
+class _LoginWindowButtons extends StatefulWidget {
+  const _LoginWindowButtons();
+
+  @override
+  State<_LoginWindowButtons> createState() => _LoginWindowButtonsState();
+}
+
+class _LoginWindowButtonsState extends State<_LoginWindowButtons> {
+  bool _pinned = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_readPin());
+  }
+
+  Future<void> _readPin() async {
+    final pinned = await windowManager.isAlwaysOnTop();
+    if (!mounted) return;
+    setState(() => _pinned = pinned);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.colorScheme.onSurface;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _icon(
+          tooltip: '置顶',
+          color: color,
+          icon: _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+          onPressed: () async {
+            final next = !_pinned;
+            await windowManager.setAlwaysOnTop(next);
+            if (!mounted) return;
+            setState(() => _pinned = next);
+          },
+        ),
+        _icon(
+          tooltip: '最小化',
+          color: color,
+          icon: Icons.remove,
+          onPressed: () => windowManager.minimize(),
+        ),
+        _icon(
+          tooltip: '关闭',
+          color: color,
+          icon: Icons.close,
+          onPressed: () {
+            globalState.appController.unBackBlock();
+            // [Gamebox] 登录窗状态下点 X 彻底退出，和托盘退出走同一条 handleExit 路径，
+            // 避免"窗口已隐藏但 gamebox 进程 + clash 内核仍残留"（登录窗被 hideUntilLogin
+            // 销毁了托盘图标，进程残留用户看不到、也点不到）。
+            globalState.appController.handleExit();
+          },
+        ),
+      ],
+    );
+  }
+}
+
+Widget _icon({
+  required String tooltip,
+  required Color color,
+  required IconData icon,
+  required VoidCallback onPressed,
+}) {
+  return IconButton(
+    tooltip: tooltip,
+    visualDensity: VisualDensity.compact,
+    onPressed: onPressed,
+    icon: Icon(icon, size: 18, color: color),
+  );
 }
 
 class _PanelLoginForm extends StatefulWidget {
@@ -129,8 +221,12 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
     // [Gamebox] 填入记住的账号后不要保持全选。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _username.selection = TextSelection.collapsed(offset: _username.text.length);
-      _password.selection = TextSelection.collapsed(offset: _password.text.length);
+      _username.selection = TextSelection.collapsed(
+        offset: _username.text.length,
+      );
+      _password.selection = TextSelection.collapsed(
+        offset: _password.text.length,
+      );
     });
     // [Gamebox] 只在冷启动自动登录。退出账号后的这一次跳过，避免马上又登回去。
     if (!saved.autoLogin) return;
@@ -174,8 +270,7 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
-    final bothEmpty =
-        _username.text.trim().isEmpty && _password.text.isEmpty;
+    final bothEmpty = _username.text.trim().isEmpty && _password.text.isEmpty;
     return Padding(
       padding: const EdgeInsets.fromLTRB(40, 40, 40, 40),
       child: Column(
@@ -263,12 +358,8 @@ class _PanelLoginFormState extends State<_PanelLoginForm> {
             label: const Text('登录'),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(45),
-              disabledBackgroundColor: _submitting
-                  ? scheme.primary
-                  : null,
-              disabledForegroundColor: _submitting
-                  ? scheme.onPrimary
-                  : null,
+              disabledBackgroundColor: _submitting ? scheme.primary : null,
+              disabledForegroundColor: _submitting ? scheme.onPrimary : null,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -535,7 +626,10 @@ Widget _check({
               child: Checkbox(
                 value: value,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                visualDensity: const VisualDensity(
+                  horizontal: -4,
+                  vertical: -4,
+                ),
                 onChanged: (next) => onChanged(next ?? false),
               ),
             ),
