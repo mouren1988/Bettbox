@@ -6,9 +6,9 @@
 > 3. 提供完整的"同步上游 / rebase / 解决冲突"操作流程
 > 4. 任何修改都要带 `// [Gamebox]` 注释，并同步更新本文件
 
-**当前 `gamebox` 分支 HEAD**：`caf6f831`（以 `https://github.com/mouren1988/Bettbox.git gamebox` 为准）
-**当前 `main` 分支 HEAD**：`7006a026`（严格等于 `upstream/main`，**不可变**）
-**当前发布版本**：`1.19.6`（`pubspec.yaml` + `version.json`）
+**当前 `gamebox` 分支 HEAD**：`337ea70f`（merge 了 `origin/main` v1.19.7 = `1fb8806f`；同步过程见 §3.20）
+**当前 `main` 分支 HEAD**：`1fb8806f`（严格等于 `upstream/main`，**不可变**）
+**当前发布版本**：`pubspec.yaml` = `1.19.7+2026102201`；`version.json` = `1.19.6+2026101601`（⚠️ **两者不一致，发版前要同步**，见 §8.4）
 **当前发布时间**：`2026-10-20`
 
 ---
@@ -37,6 +37,8 @@
   - [3.16 托盘退出通知面板下线（修在线设备不立即归零）](#316-托盘退出通知面板下线修在线设备不立即归零)
   - [3.17 显示文字全部从 Bettbox 改为 Gamebox + 删启动 splash + 登录页居中（2026-10-20）](#317-显示文字全部从-bettbox-改为-gamebox--删启动-splash--登录页居中2026-10-20)
   - [3.18 安卓端首页默认卡片布局（补回 userProfile + 重排）](#318-安卓端首页默认卡片布局补回-userprofile--重排)
+  - [3.19 安卓端默认开关调整（4 项）](#319-安卓端默认开关调整4-项)
+  - [3.20 同步上游 v1.19.7 的冲突处理记录](#320-同步上游-v1197-的冲突处理记录)
 - [5. 资源文件](#5-资源文件)
 - [6. 注释规范](#6-注释规范)
 - [7. 提交规范](#7-提交规范)
@@ -285,6 +287,17 @@ flutter analyze --no-pub
 # 必须 0 error,warning 可接受
 ```
 
+> ⚠ **为什么 `flutter analyze` 是必跑项（不能跳）**：
+> git 只检测「同一 hunk 双方都改」的冲突。上游在**Gamebox 没碰过的上下文**里引用了
+> Gamebox 已删除/改名的符号时，git 会「自动合并成功」，但代码根本编译不过。
+>
+> 实例：上游 v1.19.7 在 `lib/enum/enum.dart` 又加回了对已被 Gamebox 永久删除的
+> `outboundMode` / `outboundModeV2` 枚举值的引用（`_variantGroups` 和 `nativeSize` switch 各一处），
+> 3 个 upstream 新测试也断言了它们。git 一个冲突都没报，`flutter analyze` 才抓到
+> 4 个 `undefined_enum_constant` / `non_type_as_type_argument`。
+>
+> 详见 §3.20。
+
 ### 2.5 验证清单（rebase 完成后必查）
 
 | 项 | 命令 | 期望 |
@@ -293,8 +306,8 @@ flutter analyze --no-pub
 | locale zh | `grep "zh-Hans-CN\|zh_CN" lib/application.dart lib/views/tools.dart` | 命中 |
 | 隐藏 backup | `grep "隐藏备份" lib/views/tools.dart` | 命中 |
 | UA = Gamebox | `grep "UserAgent.*Gamebox\|defaultUA.*Gamebox" lib/models/clash_config.dart` | 命中 |
-| gh-proxy | `grep "gh-proxy.org" lib/models/clash_config.dart` | 命中 3 条 |
-| BundleMRS gh-proxy | `grep "BundleMRS" lib/views/resources.dart` | 命中 gh-proxy |
+| gh-proxy | `grep "gh-proxy.org" lib/models/clash_config.dart` | ⚠ **v1.20.0 起已主动去掉**（见 §3.3 注），命中 0 属正常；镜像改由用户自己在「资源」页配 |
+| BundleMRS gh-proxy | `grep "BundleMRS" lib/views/resources.dart` | ⚠ 同上，`resources.dart` 已改回直连 GitHub releases |
 | 仓库 fork 指向 | `grep "repository" lib/common/constant.dart` | 命中 mouren1988 |
 | 1 天更新 | `grep "defaultUpdateDuration.*1\b\|defaultUpdateDuration.*Duration.*days.*1" lib/common/constant.dart` | 命中 |
 | 蓝奏云 | `grep "lanzoup" lib/common/constant.dart` | 命中 |
@@ -347,16 +360,16 @@ flutter analyze --no-pub
 | 外部控制 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] 外部控制默认开启` |
 | 控制密码 | **空** | `lib/models/clash_config.dart` | `// [Gamebox] 控制密码为空` |
 | 全局 User-Agent | `Gamebox`（无版本号；上游 Bettbox 是 `clash.meta`,本项目刻意不带版本号）| `lib/models/clash_config.dart` | `// [Gamebox] UA 默认 Gamebox（不带版本号）` |
-| BundleMRS.7z URL | `https://v4.gh-proxy.org/https://github.com/appshubcc/bett-rules/releases/download/latest/BundleMRS.7z`（上游是 GitHub 直连）| `lib/views/resources.dart` | `// [Gamebox] BundleMRS.7z via gh-proxy mirror` |
-| GEO 默认 URL（生成器）| 3 条全部加 `https://v4.gh-proxy.org/` 前缀：`mmdb` / `asn` / `geosite`（`lib/models/generated/clash_config.g.dart:_GeoXUrlFromJson`）| `lib/models/generated/clash_config.g.dart` | `// [Gamebox] Mirrors of GitHub releases via v4.gh-proxy.org` |
-| GEO 默认 URL（源码）| 同上,3 条 `@Default()` 全部加 `https://v4.gh-proxy.org/` 前缀（`lib/models/clash_config.dart:GeoXUrl`）| `lib/models/clash_config.dart` | `// [Gamebox] GeoXUrl default URLs` |
+| BundleMRS.7z URL | `https://github.com/appshubcc/bett-rules/releases/download/latest/BundleMRS.7z`（**v1.20.0 起已改回直连**，与上游一致）| `lib/views/resources.dart` | `// [Gamebox] 资源页可自行编辑 URL` |
+| GEO 默认 URL（生成器）| 3 条**直连** GitHub releases：`mmdb` / `asn` / `geosite`（**v1.20.0 起已去掉 `v4.gh-proxy.org` 前缀**）| `lib/models/generated/clash_config.g.dart:_GeoXUrlFromJson` | `// [Gamebox] 保持与上游一致的 3 条 URL` |
+| GEO 默认 URL（源码）| 同上,3 条 `@Default()` 全部是 GitHub 直连（`lib/models/clash_config.dart:GeoXUrl`）| `lib/models/clash_config.dart` | `// [Gamebox] GeoXUrl default URLs` |
 | 虚拟网卡 | **开启（桌面端）**| `lib/models/clash_config.dart` | `// [Gamebox] 桌面端默认开启虚拟网卡` |
 | 系统代理 | **关闭** | `lib/models/clash_config.dart` | `// [Gamebox] 系统代理默认关闭` |
 | ICMP 转发 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] ICMP 转发默认开启` |
 | TUN 模式（Windows）| **开启** | `lib/models/clash_config.dart` | `// [Gamebox] TUN 默认开启` |
 
 **rebase 注意点**：
-- upstream 如果加新的 default URL,**保留 Gamebox 现有的 3 条 gh-proxy 镜像**
+- upstream 如果加新的 default URL,**跟上游保持直连**（v1.20.0 起 Gamebox 已不再强制加 `v4.gh-proxy.org` 前缀；用户想走镜像自己在「资源」页改 URL）
 - upstream 如果改 `UserAgent` 字段名,**保留 Gamebox 的 `Gamebox` 值**
 - upstream 如果删除 `cf.cloudflare.com` 测试 URL,**改用 `https://www.gstatic.com/generate_204`**
 
@@ -853,6 +866,82 @@ mobile view 固定 8 列。`crossAxisCellCount: 8` 的卡片=整行独占，`cro
 - upstream 改了 `VpnProps` 默认值（任何字段），都要重新核对 `VpnProps.safeFromJson` 里 `defaultVpnProps.copyWith(...)` 跟上游是否对齐（防止漏新字段）
 - upstream 给 `clash_config.dart` 加了新的 `FindProcessMode` 值，也要核对 `safeFormJson` 的兜底分支行为
 - 4 个开关的 Android 专用默认都是「用户偏好」，将来想改回上游默认值时，把这段 `if (system.isAndroid)` 条件删掉即可
+
+---
+
+### 3.20 同步上游 v1.19.7 的冲突处理记录（2026-10-23）
+
+本次把 `origin/main`（v1.19.7, commit `1fb8806f`）merge 进 `gamebox`，merge commit = `337ea70f`。
+**22 个文件报冲突，但只有 13 处是真实冲突** —— 详见下面的分类表。
+
+#### ⚠ 关键教训：`.gitattributes` 存在之前提交的文件带 CRLF，会让整文件冲突
+
+| 现象 | 根因 |
+|---|---|
+| `arb/*.arb`(6)、`lib/application.dart`、`lib/state.dart`、`lib/views/tools.dart`、`lib/widgets/list.dart`、`pubspec.lock` 等 **整文件** 变成冲突块（`<<<<<<<` 在第 1 行、`=======` 在中间、`>>>>>>>` 在最后一行）| Gamebox 早期提交时这些 blob 存的是 **CRLF**，`.gitattributes` 的 `* text=auto eol=lf` 是**后来**才加的，老 blob 没重新规范化。upstream 是 LF。git 逐字节 diff 认为「全不一样」，于是整个文件都成了冲突 |
+
+**处理方法（下次同步上游照做）**：
+1. 不要手工解 22 个文件 —— 先把三方版本（`:1:` base / `:2:` ours / `:3:` theirs）取出来做 **EOL 归一化**（CRLF/CR → LF），
+2. 再跑真正的三方合并（`git merge-file -p base ours theirs`），
+3. 只有剩下的冲突块才是**真实语义冲突**，数量通常是个位数。
+
+> 建议：以后新增/修改文件前确认 `.gitattributes` 生效；已入库的老 CRLF 文件如果想彻底干净，
+> 可以单独提一个「EOL 归一化」commit（只改行尾符、不改内容），之后同步上游就不会再整文件冲突。
+
+#### 本次真实冲突逐项决策（13 处）
+
+| 文件 | 冲突内容 | 决策 | 理由 |
+|---|---|---|---|
+| `lib/controller.dart` | Gamebox 硬编码英文 `'TUN mode requires administrator privileges.'` vs upstream 的 `appLocalizations.tunEnableRequireAdmin` + portable 重启按钮 | **跟上游** | Gamebox 那行没有 `[Gamebox]` 标记、也不在本文件清单里，属于早期本地顺手改的；upstream 版本已 i18n 化，且新增的 arb key 已经同步进来，跟上游才对 |
+| `lib/models/config.dart` | ① Gamebox 的 `userProfile` 补位逻辑 vs upstream 新增的 `defaultSidebarFlyoutEntries` / `sidebarFlyoutEntriesSafeFromJson` | **两边都留** | 上游是在同一位置**新增**函数，不是替换；Gamebox 的补位逻辑要保留，upstream 的新函数也要留 |
+| `lib/models/config.dart` | ② Gamebox `@Default(true) enableHighPriority` vs upstream 新增 `@Default('') backupPassword` + `enableHighPriority` | **两边都留**：保留上游新字段 `backupPassword`，但 `enableHighPriority` 维持 Gamebox 的 `true` | 上游备份功能新增字段（Gamebox 只隐藏入口、不删数据结构，见 §3.2）；高优先级是 Gamebox 明确的开源默认（§3.4）|
+| `lib/views/dashboard/widgets/outbound_mode.dart` | Gamebox 的 throw stub vs upstream 完整的 `_OutboundModeButton` / `_OutboundStatusChips` 实现 | **保留 Gamebox stub** | §3.7 规定永久删除出站模式卡片。上游实现依赖 `Mode` enum + 一堆 provider，留着是死代码 |
+| `lib/widgets/list.dart` | Gamebox 给 `CommonCard` 传 `textColor` vs upstream 把内联 Column 抽成 `content` 变量 | **两边都留**：`child: content` + 保留 `textColor:` | 上游是纯重构（行为不变），Gamebox 的 `textColor` 是额外能力，`CommonCard` 本来就有这个参数 |
+| `setup.dart` | Gamebox 漏了 `await` + 传 `compatible:` vs upstream 补上 `await` 且不传 `compatible` | **取上游的 `await` + 保留 `compatible:`** | `await` 是上游修的真 bug（macOS dmg 可能没打好就退出）；`compatible` 在 macOS 分支恒为 `false`（`execute()` 已限制 `--compatible` 只对 windows/linux 生效），传不传行为一致 |
+| `windows/packaging/exe/package_windows.dart` | ① core/helper 可执行名、服务名、管道名、计划任务名 ② `PUBLISHER_URL` / `INSTALL_DIR_NAME` ③ portable zip 文件名 | **全部保留 Gamebox 的 `$productName` / `$displayName` 参数化写法** | §3.6 要求全局 Bettbox→Gamebox；Gamebox 写法还更好：上游硬编码 `'Bettbox'` 字符串，Gamebox 用 `make_config.yaml` 的值派生，改一处就够 |
+
+#### ⚠ 额外抓到的「静默合并」坑（git 没报冲突但会编译不过）
+
+`lib/enum/enum.dart` 上游 v1.19.7 **又加回了**对已被 Gamebox 删除的 `outboundMode` / `outboundModeV2` 枚举值的引用：
+
+```dart
+// 上游加回的 3 处，Gamebox 必须剔除（否则 undefined_enum_constant 编译错误）
+static const _variantGroups = [ ..., [outboundModeV2, outboundMode], ... ];
+DashboardTileSize get nativeSize => switch (this) {
+  outboundModeV2 => DashboardTileSize.wide,          // ← 删
+  outboundMode || mediaUnlockSmall || ... => ...,   // ← outboundMode || 删掉
+};
+```
+
+这几行落在 Gamebox 没改过的上下文里，git 认为「自动合并成功」，**但引用的枚举值不存在**。
+只有 `flutter analyze` 才能抓到 —— 所以每次同步上游后**必须**跑一次 `flutter analyze`（§8）。
+
+连带修的两个上游新测试（它们断言了被 Gamebox 删除的枚举值）：
+- `test/views/dashboard_tile_test.dart` → 改用 `DashboardWidget.trafficUsage` 验证 tall 尺寸
+- `test/widgets/editable_grid_test.dart` → 改用 `mediaUnlockSmall.family` 验证归并逻辑
+
+#### 生成代码不要手工解冲突
+
+`lib/models/generated/{clash_config,config}.{freezed.dart,g.dart}` 这 4 个文件的冲突**全部由源文件自动决定**，
+手工解容易和 `build_runner` 的输出不一致。正确做法：
+
+```bash
+flutter pub get
+dart run build_runner build          # 注意：新版已移除 --delete-conflicting-outputs
+flutter analyze --no-pub
+```
+
+`build_runner` 会同时吃到：Gamebox 的默认值（`tun.enable=true`、`disableIcmpForwarding=false`、`enableHighPriority=true`、`disclaimerAccepted=true`）
+和上游新加的字段（`Tun.dnsMode`、`AppSettingProps.backupPassword`），不需要手工取舍。
+
+#### 本次验证结果
+
+| 项 | 结果 |
+|---|---|
+| `git diff --diff-filter=U` | 0（无未解决冲突） |
+| `flutter analyze` | **0 error**（4 warning 是合并前就有的：`window.dart` 未用 import/变量、`controller.dart` 重复 import/未用变量）|
+| `flutter test` | 15 failing（合并**前**同分支是 28 failing → 上游顺带修好了 13 个，本次无新增失败）|
+| `[Gamebox]` 标记总数 | 224 |
 
 ---
 

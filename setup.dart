@@ -905,12 +905,17 @@ class BuildCommand extends Command {
           Build.getExecutable('pod install --repo-update'),
           workingDirectory: 'macos',
         );
-        _buildDistributor(
+// ↑ upstream v1.19.7 补上缺失的 await（原来是 fire-and-forget，
+        //   _buildDistributor 未等完就 return，dmg 可能没打好就退出）。
+        await _buildDistributor(
           target: target,
           targets: 'dmg',
           args: ' --description $desc',
           env: env,
           suffix: appAssetSuffix,
+          // [Gamebox] 保留 Gamebox 的 compatible 透传。
+          //   execute() 已限制 --compatible 只对 windows/linux 生效，
+          //   macOS 上该值恒为 false，所以行为与上游去掉此参数完全一致。
           compatible: compatible,
         );
         return;

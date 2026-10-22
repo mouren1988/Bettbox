@@ -30,7 +30,7 @@ class OutboundModeV2 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    throw UnsupportedError(
+throw UnsupportedError(
       '[Gamebox] OutboundModeV2 widget has been permanently removed. '
       'Use the system tray menu or web panel to change proxy mode.',
     );

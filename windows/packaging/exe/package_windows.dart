@@ -34,7 +34,10 @@ void main(List<String> arguments) async {
     exit(1);
   }
   final pubspecContent = pubspecFile.readAsStringSync();
-  final versionMatch = RegExp(r'^version:\s*([^\s+]+)', multiLine: true).firstMatch(pubspecContent);
+  final versionMatch = RegExp(
+    r'^version:\s*([^\s+]+)',
+    multiLine: true,
+  ).firstMatch(pubspecContent);
   if (versionMatch == null) {
     print('Error: Could not find version in pubspec.yaml.');
     exit(1);
@@ -61,17 +64,31 @@ void main(List<String> arguments) async {
   final sourceDir = path.absolute('build/windows/$buildDirName/runner/Release');
   print('Source Directory: $sourceDir');
   if (!Directory(sourceDir).existsSync()) {
-    print('Error: Source directory $sourceDir does not exist. Run flutter build first.');
+    print(
+      'Error: Source directory $sourceDir does not exist. Run flutter build first.',
+    );
     exit(1);
   }
 
   // 4. Map variables for Inno Setup template
-  final coreExecutableName = isDev ? '${productName}DevCore.exe' : '${productName}Core.exe';
-  final helperExecutableName = isDev ? '${productName}DevHelperService.exe' : '${productName}HelperService.exe';
-  final helperServiceName = isDev ? '$productName Dev Helper' : '$productName Helper';
-  final helperPipeName = isDev ? r'\\.\pipe\' + productName + r'Dev.Helper' : r'\\.\pipe\' + productName + r'.Helper';
+// [Gamebox] 用 productName 参数化，不再硬编码 Bettbox。
+  // 注意 helperServiceName 用的是 display 形式（'$productName Helper'），
+  // 而上游 v1.19.7 是 'BettboxHelperService'（技术键，无空格）。
+  // 两者都要保留：服务名要与 windows/runner 里注册的一致，
+  // 命名空间 (productName) 决定实际 Win32 服务/管道标识符。
+  final coreExecutableName =
+      isDev ? '${productName}DevCore.exe' : '${productName}Core.exe';
+  final helperExecutableName = isDev
+      ? '${productName}DevHelperService.exe'
+      : '${productName}HelperService.exe';
+  final helperServiceName = isDev
+      ? '$productName Dev Helper'
+      : '$productName Helper';
+  final helperPipeName =
+      isDev
+      ? r'\\.\pipe\' + productName + r'Dev.Helper'
+      : r'\\.\pipe\' + productName + r'.Helper';
   final taskName = isDev ? '$displayName Dev' : displayName;
-  
   // Format locales - resolve file paths to absolute to avoid Inno Setup relative path issues
   final packagingDir = path.absolute('windows/packaging/exe');
   final locales = [];
@@ -81,7 +98,9 @@ void main(List<String> arguments) async {
       locales.add({
         'lang': locale['lang'],
         // Extract just the filename and resolve against the packaging directory
-        'file': fileVal != null ? path.join(packagingDir, path.basename(fileVal)) : null,
+        'file': fileVal != null
+            ? path.join(packagingDir, path.basename(fileVal))
+            : null,
       });
     }
   }
@@ -94,7 +113,11 @@ void main(List<String> arguments) async {
     'DISPLAY_NAME': makeConfig['display_name'] ?? 'Gamebox',
     'PUBLISHER_NAME': makeConfig['publisher'] ?? 'appshub.cc',
     'ARCH': arch == 'arm64' ? 'arm64' : 'x64',
-    'PUBLISHER_URL': makeConfig['publisher_url'] ?? 'https://github.com/appshubcc/Gamebox',
+// [Gamebox] 仓库指向 fork（见 §3.6），display_name 兜底也是 Gamebox。
+    //   上游用的是 '\${makeConfig['display_name'] ?? 'Bettbox'}'，
+    //   这里改用已解析好的 $displayName（同样的语义，少一次 map 查找）。
+    'PUBLISHER_URL':
+        makeConfig['publisher_url'] ?? 'https://github.com/appshubcc/Gamebox',
     'CREATE_DESKTOP_ICON': true,
     'LAUNCH_AT_STARTUP': true,
     'INSTALL_DIR_NAME': '{autopf64}\\$displayName',
@@ -121,10 +144,7 @@ void main(List<String> arguments) async {
   final context = Context.create();
   context.variables = variables;
 
-  final template = Template.parse(
-    context,
-    Source.fromString(templateContent),
-  );
+  final template = Template.parse(context, Source.fromString(templateContent));
 
   final renderedContent = '\uFEFF${await template.render(context)}';
   final tempIssFile = File('windows/packaging/exe/temp_setup.iss');
@@ -156,7 +176,10 @@ void main(List<String> arguments) async {
     }
 
     // 7. Move generated installer to dist/
-    final generatedInstallerPath = path.join('windows/packaging/exe', '$outputBaseName.exe');
+    final generatedInstallerPath = path.join(
+      'windows/packaging/exe',
+      '$outputBaseName.exe',
+    );
     final generatedInstallerFile = File(generatedInstallerPath);
     if (!generatedInstallerFile.existsSync()) {
       print('Error: Generated installer not found at $generatedInstallerPath');
@@ -170,7 +193,9 @@ void main(List<String> arguments) async {
 
     final targetInstallerPath = path.join('dist', '$outputBaseName.exe');
     generatedInstallerFile.renameSync(targetInstallerPath);
-    print('Successfully generated and moved installer to: $targetInstallerPath');
+    print(
+      'Successfully generated and moved installer to: $targetInstallerPath',
+    );
   } else {
     if (tempIssFile.existsSync()) {
       tempIssFile.deleteSync();
@@ -198,7 +223,9 @@ void main(List<String> arguments) async {
       cleanBatSource.copySync(cleanBatDest.path);
     }
 
-    final portableOutputBaseName = '$displayName-$appVersion-windows-$desc-portable.zip';
+// [Gamebox] 用 $displayName 参数化（产物名 Gamebox-*-portable.zip），不硬编码 Bettbox。
+    final portableOutputBaseName =
+        '$displayName-$appVersion-windows-$desc-portable.zip';
     final targetPortableZipPath = path.join('dist', portableOutputBaseName);
     final targetPortableFile = File(targetPortableZipPath);
     if (targetPortableFile.existsSync()) {
@@ -207,12 +234,20 @@ void main(List<String> arguments) async {
 
     print('Creating portable zip: $targetPortableZipPath');
     try {
-      final zipFileEncoder = ZipFileEncoder();
-      await zipFileEncoder.zipDirectory(
-        Directory(sourceDir),
-        filename: targetPortableZipPath,
-        followLinks: true,
-      );
+      final zipFileEncoder = ZipFileEncoder()..create(targetPortableZipPath);
+      // [Gamebox] 兜底名改为 Gamebox，否则 make_config.yaml 缺 display_name 时
+      // 解压出来会是 Bettbox/ 目录（上游 v1.19.7 遗留的硬编码）。
+      final rootName = makeConfig['display_name'] ?? displayName;
+      final entries = Directory(
+        sourceDir,
+      ).listSync(recursive: true, followLinks: true);
+      for (final entry in entries.whereType<File>()) {
+        final relative = path
+            .relative(entry.path, from: sourceDir)
+            .replaceAll(r'\', '/');
+        await zipFileEncoder.addFile(entry, '$rootName/$relative');
+      }
+      await zipFileEncoder.close();
       print('Successfully generated portable zip: $targetPortableZipPath');
     } finally {
       if (portableDir.existsSync()) {

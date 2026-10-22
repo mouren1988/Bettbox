@@ -174,7 +174,7 @@ List<DashboardWidget> desktopDashboardWidgetsSafeFromJson(
   } catch (_) {
     widgets = defaultDashboardWidgets;
   }
-  // [Gamebox] 旧配置里没有这张卡时，放在网络速度后面，和确认过的排版一致�?
+// [Gamebox] 旧配置里没有这张卡时，放在网络速度后面，和确认过的排版一致。
   if (!widgets.contains(DashboardWidget.userProfile)) {
     final next = List<DashboardWidget>.from(widgets);
     final index = next.indexOf(DashboardWidget.networkSpeed);
@@ -184,8 +184,8 @@ List<DashboardWidget> desktopDashboardWidgetsSafeFromJson(
   return widgets;
 }
 
-// [Gamebox] 首页连通性测试默认三项。上游默认是 reddit、gemini、cloudflare�?
-// 同步时默认项按需求改�?spotify、discord、youtube�?
+// [Gamebox] 首页连通性测试默认三项。上游默认是 reddit、gemini、cloudflare。
+// 同步时默认项按需求改成 spotify、discord、youtube。
 // [Gamebox] Upstream pinned defaults: spotify, discord, youtube.
 // Gamebox swaps spotify -> gemini (gemini is more practical in CN use).
 const List<MediaPlatform> defaultPinnedMediaPlatforms = [
@@ -227,9 +227,13 @@ List<MediaPlatform> pinnedMediaPlatformsSafeFromJson(
   }
 }
 
+// ↑ upstream v1.19.7 新增：侧边栏 flyout 入口列表。
+// [Gamebox] 原样跟随上游的 8 项（含 toolbox）。备份与恢复（backupAndRecovery）
+// 虽然 enum 里还在，但 Gamebox 已在侧边栏隐藏（见 §3.2），所以不放进默认列表。
 const List<SidebarFlyoutEntry> defaultSidebarFlyoutEntries = [
   SidebarFlyoutEntry.resources,
   SidebarFlyoutEntry.script,
+  SidebarFlyoutEntry.toolbox,
   SidebarFlyoutEntry.theme,
   SidebarFlyoutEntry.basicConfig,
   SidebarFlyoutEntry.otherSettings,
@@ -297,7 +301,9 @@ abstract class AppSettingProps with _$AppSettingProps {
     @Default(true) bool keepDockIcon,
     @Default(false) bool developerMode,
     @Default(RecoveryStrategy.compatible) RecoveryStrategy recoveryStrategy,
-    // [Gamebox] 增强工具 > 高优先级默认开启。上游默�?false。同步时保留 true�?
+// ↑ upstream v1.19.7 新增：备份密码（Gamebox 隐藏了备份入口，但字段保留以兼容 upstream 数据结构）
+    @Default('') String backupPassword,
+    // [Gamebox] 增强工具 > 高优先级默认开启。上游默认 false。同步时保留 true。
     @Default(true) bool enableHighPriority,
     // [Gamebox] 主界面左侧菜单栏默认隐藏。上游默认 false。同步时保留 true。
     @Default(true) bool sidebarCollapsed,
@@ -308,6 +314,16 @@ abstract class AppSettingProps with _$AppSettingProps {
     @JsonKey(fromJson: sidebarFlyoutEntriesSafeFromJson)
     List<SidebarFlyoutEntry> sidebarFlyoutEntries,
     String? dashboardTitle,
+    @Default(<String>[]) List<String> toolboxTiles,
+    @Default(false) bool mrsCopyRawLink,
+    @JsonKey(unknownEnumValue: MrsRawSource.bettRules)
+    @Default(MrsRawSource.bettRules)
+    MrsRawSource mrsRawSource,
+    @Default(true) bool mrsResolveDns,
+    @Default(IperfOptions()) IperfOptions iperfOptions,
+    @Default(LocalPingOptions()) LocalPingOptions localPingOptions,
+    @Default(<String, String>{}) Map<String, String> mobileDashboardSizes,
+    @Default(<String, String>{}) Map<String, String> desktopDashboardSizes,
   }) = _AppSettingProps;
 
   factory AppSettingProps.fromJson(Map<String, Object?> json) =>
