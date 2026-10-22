@@ -300,6 +300,24 @@ flutter analyze --no-pub
 
 ### 2.5 验证清单（rebase 完成后必查）
 
+**先验内核同步（最重要，优先级高于所有 Dart 侧检查）**：
+
+| 项 | 命令 | 期望 |
+|---|---|---|
+| **内核目录与上游一致** | `git diff --stat HEAD <upstream-main> -- core/` | **输出为空**。`core/` 是 in-tree vendored（不是 submodule，仓库里没有 `.gitmodules`），所以 Gamebox 侧一旦有本地改动就会在这里显示。空 = 内核与上游逐字节相同 |
+| 内核文件数一致 | `git ls-tree -r --name-only HEAD -- core/ \| Measure-Object -Line` | 与上游同一数字（v1.19.7 时是 **1096**）|
+
+> ⚠ **为什么内核这条要单独拎出来**：Gamebox 对 `core/` **没有任何定制**（不要在 `core/` 里改代码），
+> 内核版本完全由「是否把上游 `core/` 整棵树带过来」决定。
+> 一次 merge 如果只带了 `lib/` 没带 `core/`（或反过来 core 冲突被误跳过），
+> Dart 侧 `flutter analyze` 照样 0 error —— **只有这条 diff 能发现**。
+>
+> 内核版本号本身在 `core/Clash.Meta/constant/version.go` 里是空的（`Version = ""`），
+> 构建时才通过 `-ldflags` 注入，所以**别指望在源码里 grep 到 `v1.19.33`**，
+> 要确认版本就比对 `core/` 整棵树，或看构建产物的版本输出。
+
+**再验 Dart 侧定制**：
+
 | 项 | 命令 | 期望 |
 |---|---|---|
 | 主题 dark | `grep "themeMode.*dark" lib/models/config.dart` | 命中 |
@@ -311,7 +329,7 @@ flutter analyze --no-pub
 | 仓库 fork 指向 | `grep "repository" lib/common/constant.dart` | 命中 mouren1988 |
 | 1 天更新 | `grep "defaultUpdateDuration.*1\b\|defaultUpdateDuration.*Duration.*days.*1" lib/common/constant.dart` | 命中 |
 | 蓝奏云 | `grep "lanzoup" lib/common/constant.dart` | 命中 |
-| fast 动画 | `grep "fast.*50ms\|animation.*first" lib/models/generated/config.g.dart` | 命中 |
+| ~~fast 动画~~ | ⚠️ **已作废**：上游删掉了这个可配置项，改用硬编码 `midDuration = 200ms`。**不要再当定制项检查**，命中 0 属正常 |
 | about.dart do-not-rebase 标记 | `head -5 lib/views/about.dart` | 第一行有标记 |
 | profile url hash | `grep "sha256" lib/models/profile.dart` | 命中 |
 | 不删 deleteAllProfiles | `grep -c "deleteAllProfiles" lib/panel/panel_auth.dart` | 0（已删 3 处）|
@@ -382,7 +400,7 @@ flutter analyze --no-pub
 | 高优先级 | **开启** | `lib/models/clash_config.dart` | `// [Gamebox] 高优先级开启` |
 | 悬浮面板 | **开启** | `lib/models/config.dart` | `// [Gamebox] 悬浮面板开启` |
 | 联动开关 | **关闭** | `lib/models/config.dart` | `// [Gamebox] 联动开关默认关闭` |
-| 延迟动画 | **fast（50ms,UI 第一项）**（上游默认 standard/150ms）| `lib/models/generated/config.g.dart` | `// [Gamebox] 动画默认第一个（fast）` |
+| 延迟动画 | ❌ **该定制已作废，保持和上游一致** —— 上游把这个可配置项删掉了，现在全局用硬编码常量 `midDuration = Duration(milliseconds: 200)`（`lib/common/constant.dart`）。Gamebox 不再单独定制 | `lib/common/constant.dart` | 无 `[Gamebox]` 标记（跟随上游） |
 | 回环保护 | **跟随上游**（`@Default(true)`）| `lib/models/config.dart` | `// [Gamebox] 跟随上游` |
 
 ### 3.5 检查更新（不走 GitHub releases）
@@ -939,9 +957,63 @@ flutter analyze --no-pub
 | 项 | 结果 |
 |---|---|
 | `git diff --diff-filter=U` | 0（无未解决冲突） |
+| **`core/` vs 上游** | **完全一致（1096 文件逐字节相同）→ 内核已同步到 v1.19.33** |
 | `flutter analyze` | **0 error**（4 warning 是合并前就有的：`window.dart` 未用 import/变量、`controller.dart` 重复 import/未用变量）|
 | `flutter test` | 15 failing（合并**前**同分支是 28 failing → 上游顺带修好了 13 个，本次无新增失败）|
-| `[Gamebox]` 标记总数 | 224 |
+| `[Gamebox]` 标记总数 | 225 |
+| 42 项定制逐项比对（合并前 vs 合并后）| **38 项 INTACT，0 项 LOST** |
+
+#### 内核同步核对（Mihomo v1.19.33）
+
+Gamebox 对 `core/` **零定制** —— 内核是 in-tree vendored（仓库无 `.gitmodules`，`core/Clash.Meta` 也不是独立 git 仓库），
+所以"内核有没有更新"完全取决于上游那 1096 个文件的树有没有被完整带过来。
+
+| 核对点 | 结果 |
+|---|---|
+| `git diff HEAD upstream/main -- core/` | **空**（逐字节一致）|
+| 文件数 | 1096 = 1096 ✅ |
+| `core/Clash.Meta/go.mod` | 与上游一致 ✅ |
+| v1.19.33 新特性抽查 | TUN `dns-mode`（`TunDnsMode`）✅；`core/toolbox/` 全套 iPerf3/STUN/speedtest/route-trace 端点 ✅ |
+
+> ⚠️ **内核版本号在源码里查不到**：`core/Clash.Meta/constant/version.go` 是 `Version = ""`，
+> 真正的版本号在构建时通过 `-ldflags` 注入（`setup.dart` 的 `buildCore`）。
+> 想确认"跑起来的是不是 v1.19.33"，要么比对 `core/` 整棵树，要么看运行时的内核版本输出。
+
+#### v1.19.7 更新日志逐条核对
+
+| 上游 changelog | 是否同步 | 依据 |
+|---|---|---|
+| 多端网络调试工具（iPerf3/STUN/speedtest/route-trace/age/DNS 查询/MRS）| ✅ | `core/toolbox/*.go` 12 个端点 + `lib/pages/toolbox/` 9 个页面 + `lib/views/toolbox.dart` |
+| WebDAV 自动备份 + 备份密码 AES | ✅ | `lib/views/backup_and_recovery.dart` + `AppSettingProps.backupPassword`（**字段保留，入口按 §3.2 隐藏**）|
+| 请求页与连接页合并 | ✅ | `lib/views/connection/requests.dart` 已删除 |
+| 流媒体解锁批量节点检测 | ✅ | `lib/common/media_unlock_checker.dart` + `lib/pages/media_unlock.dart` |
+| 首页/工具箱无界水印大图标 | ✅ | `lib/views/toolbox.dart` |
+| Android 莫奈取色（12+）| ✅ | `lib/state.dart:_initDynamicColor()` → `DynamicColorPlugin.getCorePalette()` / `MaterialDynamicColors` |
+| 配置覆写逻辑优化 | ✅ | `lib/views/profiles/override_profile.dart` |
+| macOS Dock 图标与窗口同步 | ✅ | `macos/Runner/AppDelegate.swift` + `lib/manager/window_manager.dart` |
+| Windows 便携版目录改进 | ✅ | `windows/packaging/exe/package_windows.dart` + `lib/common/path.dart` |
+| Linux 自动 DNS 管理修复 | ✅ | `lib/state.dart` 的 DNS 相关逻辑与上游**逐字节一致**（diff 为空）|
+| 桌面端内核断开自动重启 | ✅ | `lib/controller.dart` + `lib/state.dart` |
+| 编辑器语法高亮/折叠/搜索性能 | ✅ | `plugins/code_forge/rust/src/editor/{highlight,folds,search}.rs` |
+| 修复渲染引擎引起的桌面端兼容问题 | ✅ | 与 §3.14「Impeller 无条件禁」同向 —— 该项已按 v1.19.6/v1.19.7 上游写法无条件禁用 |
+| **新 Slogan "Better Network Toolbox"** | ⚠️ **仅文档，非 App UI** | 只存在于 `README.md` / `readme/README_*.md`。`readme/` 6 个语言文件与上游逐字节一致；根 `README.md` 因上游更新而被带入，仍写 "Bettbox"。**App 内没有任何 slogan 文案**，所以对用户无影响。按用户决定：**README 保持和上游一致，不改** |
+
+#### 已知残留的 "Bettbox" 用户可见文案（**均非本次合并引入**，是上游自己的）
+
+跑了一遍全仓品牌审计（排除注释 / 包名 / URL / 技术标识符 / channel ID 之后），
+仍有 3 处用户能看到 "Bettbox"。已逐个比对确认**合并前后完全相同**（上游原样如此），不是合并弄丢的：
+
+| 位置 | 文案 | 是否用户可见 | 处置 |
+|---|---|---|---|
+| `arb/intl_*.arb`（7 语言 ×2 条）| `iperfScanHint` / `iperfFirewallTip`（iPerf3 工具提示里提到 "Bettbox"）| ✅ **是**，工具箱 iPerf 页可见 | 待定：想改就把 7 个 arb 里的 "Bettbox" → "Gamebox" 后跑 `intl_utils` 重生成 |
+| `lib/views/profiles/tv_qr_import_dialog.dart` | Android TV 推送页 `title: 'Bettbox 配置推送'` | ✅ **是**，TV 扫码导入弹窗标题 | 待定：改成 Gamebox |
+| `lib/main.dart:257` | `profile?.label ?? 'Bettbox'`（网速通知的兜底名）| ⚠️ 仅当 profile 没 label 时才用，正常路径看不到 | 可不改 |
+| `distribute_options.yaml` | `app_name: 'Bettbox'` | ❌ 打包用（Linux deb/rpm），Windows 安装器用的是 `make_config.yaml` 里的 Gamebox | 可不改 |
+
+> 其余 60+ 处 `Bettbox`/`bettbox` 全是**技术标识符**，不改是对的：
+> 包名 `com.appshub.bettbox.*`、URL scheme `bettbox://`、通知渠道 ID `Bettbox`/`Bettbox_High`/`Bettbox_Suspended`、
+> Unix socket 名、polkit 规则文件名、salt、`BettboxCore.exe` 二进制名、测试临时文件名等。
+> 见 §3.17「为什么 channel 名/ID 不一并改」。
 
 ---
 
