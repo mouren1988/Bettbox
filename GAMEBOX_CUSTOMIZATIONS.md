@@ -36,7 +36,7 @@
   - [3.15 检查更新修复（2026-10-20）](#315-检查更新修复2026-10-20)
   - [3.16 托盘退出通知面板下线（修在线设备不立即归零）](#316-托盘退出通知面板下线修在线设备不立即归零)
   - [3.17 显示文字全部从 Bettbox 改为 Gamebox + 删启动 splash + 登录页居中（2026-10-20）](#317-显示文字全部从-bettbox-改为-gamebox--删启动-splash--登录页居中2026-10-20)
-  - [3.18 安卓端首页默认卡片布局（补回 userProfile + 重排）](#318-安卓端首页默认卡片布局补回-userprofile--重排)
+  - [3.18 安卓端首页默认卡片布局（v3.21 全单宽版）](#318-安卓端首页默认卡片布局v321-全单宽版)
   - [3.19 安卓端默认开关调整（4 项）](#319-安卓端默认开关调整4-项)
   - [3.20 同步上游 v1.19.7 的冲突处理记录](#320-同步上游-v1197-的冲突处理记录)
 - [5. 资源文件](#5-资源文件)
@@ -846,7 +846,7 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 
 ---
 
-### 3.18 安卓端首页默认卡片布局（v3.20 瀑布流最终版）
+### 3.18 安卓端首页默认卡片布局（v3.21 全单宽版）
 
 | 列 | 行号 | 改前（左图错版） | 改后（右图确认版） |
 |---|---|---|---|
@@ -889,12 +889,77 @@ mobile view 固定 8 列。`crossAxisCellCount: 8` 的卡片=整行独占，`cro
 | v3.18 之前 | 漏 userProfile |
 | v3.18 第一版 | 把 userProfile 放首位，networkSpeed 被挤到第 2 行 |
 | v3.19 第一版 | 第 3 行放反（memoryInfo \| networkDetection），漏 mediaUnlock |
-| v3.20 第一/二版 | 以为左右对调即可，来回改了两遍 |
-| **v3.20 最终版** | 瀑布流落位：mediaUnlockSmall → networkDetection → startButton → connectionsCount |
+| v3.20 第一/二版 | 以为左右对对调即可，来回改了两遍 |
+| v3.20 最终版 | 瀑布流落位调对了，但首行仍是 **networkSpeed(8 列)**，右下留空 |
+| **v3.21（当前）** | **改为全单宽**：首行换成 `networkSpeedSmall`，顺序按用户实机 `config.json` 逐项对齐 |
+
+---
+
+#### v3.21：改成全单宽（2026-10-23）
+
+起因是用户提供了**安卓实机的 `config.json`**，其 `mobileDashboardWidgets` 为：
+
+```json
+["networkSpeedSmall","userProfile","trafficUsage","networkDetection",
+ "intranetIp","mediaUnlockSmall","memoryInfo","connectionsCount","startButton"]
+```
+
+逐项和代码里的 v3.20 最终版比对，差异有两处：
+
+1. **首行卡片不同** —— 实机是 `networkSpeedSmall`，代码是 `networkSpeed`。
+2. **多了 `intranetIp`（内网 IP）** —— 实机有，代码里没有。
+
+**为什么 `networkSpeedSmall` 才是对的**：
+
+`mobileDashboardSizes: {}` 为空，即所有卡片都用 `nativeSize`。而 `nativeSize` 定义在 `lib/enum/enum.dart`：
+
+```dart
+networkSpeed    => DashboardTileSize.large  // crossAxisCellCount: 8，整行独占
+networkSpeedSmall => DashboardTileSize.small // crossAxisCellCount: 4，半宽
+```
+
+`networkSpeed` 是 **8 列 = 整行独占**，会让首行右侧空出 4 列。
+v3.18/3.19/3.20 反复排错的根因就在这里——瀑布流里放一张双宽卡，
+其余单宽卡补不上那个空位，整张首页就会错位。
+
+改成 `networkSpeedSmall` 后**全部卡片都是 4 列**，一行两张整齐并排，
+不再有"补不满的空位"这个问题。这也是为什么实机能稳定显示成截图那样。
+
+**改动后（v3.21）**：
+
+```dart
+const List<DashboardWidget> defaultAndroidDashboardWidgets = [
+  networkSpeedSmall,   // ┐ 第 1 行
+  userProfile,         // ┘
+  trafficUsage,        // ┐ 第 2 行
+  networkDetection,    // ┘
+  intranetIp,          // ┐ 第 3 行
+  mediaUnlockSmall,    // ┘
+  memoryInfo,          // ┐ 第 4 行
+  connectionsCount,    // ┘
+  startButton,         // 第 5 行 单卡
+];
+```
+
+**注意（易踩坑）**：
+
+- `networkSpeed` 与 `networkSpeedSmall` 属于**同一 family**（`variants`）。
+  用户在设置里手动把网络速度卡放大时，仍会切到 `networkSpeed` 组件，
+  不影响"默认用 small"这件事。
+- `trafficUsage` 与 `mediaUnlockSmall` 的 `nativeSize` 是 **`tall`(高卡)**，
+  不是 small。同一行里高卡会让对侧的卡往下挪——这是瀑布流的正常落位，
+  **不是 bug**，别再当成排错线索。
+
+**⚠️ 这次改动只影响新装用户**：`config.json` 里已写死
+`mobileDashboardWidgets`，`@Default` 只在字段完全缺失时生效。
+升级用户（含用户自己）**不会**被改成新布局 —— 这正是期望行为
+（3.20 起已明确不再强制覆盖用户顺序）。回归测试
+`test/models/android_dashboard_default_test.dart` 把顺序 + 宽度都钉死了。
 
 **代码位置**：
 
-- `lib/models/config.dart` — `defaultAndroidDashboardWidgets` 最终版
+- `lib/models/config.dart` — `defaultAndroidDashboardWidgets`（v3.21 全单宽版）
+- `test/models/android_dashboard_default_test.dart` — 顺序/宽度/唯一性/平台可用性回归测试（6 条）
 - `lib/models/config.dart` — `legacyAndroidDefaultDashboardWidgets`（v3.18 之前漏 userProfile 的版本，作迁移比对用）
 - `lib/models/config.dart` — `misplacedV3_18DashboardWidgets`（v3.18 第一次发版的错版，作迁移比对用，过几个版本后可删）
 - `lib/models/config.dart` — `_isLegacyAndroidDefaultDashboard()` + `_isMisplacedV3_18Dashboard()`（双迁移分支）

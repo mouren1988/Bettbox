@@ -97,21 +97,26 @@ const List<DashboardWidget> misplacedV3_18DashboardWidgets = [
 // safeFromJson still handles stale config files that reference the old
 // enum names by falling back to the default widget list.
 //
-// [Gamebox] Android 默认布局（v3.20 最终版，按用户手编版确认）。
-// mobile view 固定 8 列：8 列 = 整行，4 列 = 半宽（一行并排两张）。
-//   第 1 行：网络速度(networkSpeed，整行独占，最宽)
-//   第 2 行：流量统计(trafficUsage) + 订阅信息(userProfile)
-//   第 3 行：连通性测试(mediaUnlockSmall) + 网络检测(networkDetection)
-//   第 4 行：启动开关(startButton) + 活跃连接(connectionsCount)
-//   第 5 行：内存信息(memoryInfo)
+// [Gamebox] Android 默认布局（v3.21，按用户实机 config.json 逐项核对后定稿）。
+// mobile view 固定 8 列，本版**全部卡片都是 4 列(单宽)**，一行并排两张：
+//   第 1 行：网络速度(networkSpeedSmall) + 订阅信息(userProfile)
+//   第 2 行：流量统计(trafficUsage) + 网络检测(networkDetection)
+//   第 3 行：内网 IP(intranetIp) + 解锁检测(mediaUnlockSmall)
+//   第 4 行：内存信息(memoryInfo) + 活跃连接(connectionsCount)
+//   第 5 行：启动开关(startButton，单卡)
 //
 // ⚠ 注意：这不是普通网格，而是 masonry 瀑布流（见 widgets/grid.dart 的
 // `_getOrigin`）。每张卡落在当前 dy 最小的列上，所以「行」只是视觉结果，
-// 真实落位由卡片高度决定。第 3 行右边的 networkDetection 比左边的
-// mediaUnlockSmall 矮，右列下方会留一个空位；必须让**矮的** startButton
-// 紧跟在 networkDetection 后面去填那个空位，高一点的 connectionsCount
-// 才会被挤到下一行左侧。把这两张卡的顺序反过来就会得到
-// 「连通性测试 | 网络检测 / 活跃连接 | 启动开关」的错版。
+// 真实落位由卡片高度决定。
+//
+// 🔑 关键点：首行必须用 **networkSpeedSmall(4 列)** 而不是 networkSpeed(8 列)。
+// networkSpeed 是整行独占的双宽卡，放首行会把 userProfile 挤到下一行，
+// 且右列留空——这正是 3.18/3.19/3.20 反复排错的根因。本版全部单宽，
+// 不存在这个问题。networkSpeed 与 networkSpeedSmall 属同一 family
+// (variants)，用户手动放大网络速度卡时仍会切换到 networkSpeed 组件。
+//
+// ⚠ trafficUsage 的 nativeSize 是 tall(高卡)，放在第 2 行左侧会把
+// 同一行的 networkDetection 挤低，属于瀑布流的正常落位，不是 bug。
 //
 // 之前出过几版错的：
 //   - 旧默认漏掉 userProfile（最早的原版清单）
@@ -119,16 +124,20 @@ const List<DashboardWidget> misplacedV3_18DashboardWidgets = [
 //     被挤到第 2 行，整张首页布局崩。
 //   - 3.19 第一版第 3 行放反(memoryInfo | networkDetection)，且漏了
 //     mediaUnlock(连通性测试)。已通过 safeFromJson 迁移到本版。
-//   - 3.20 误以为左右对调即可，来回改了两次，实际是瀑布流落位问题。
+//   - 3.20 误以为左右对调即可，来回改了两次，实际是瀑布流落位问题；
+//     且首行误用 networkSpeed(8 列)。
+//   - 3.21 本版：改成全单宽(networkSpeedSmall)，顺序与用户实机
+//     config.json 完全一致。
 const List<DashboardWidget> defaultAndroidDashboardWidgets = [
-  DashboardWidget.networkSpeed,
-  DashboardWidget.trafficUsage,
+  DashboardWidget.networkSpeedSmall,
   DashboardWidget.userProfile,
-  DashboardWidget.mediaUnlockSmall,
+  DashboardWidget.trafficUsage,
   DashboardWidget.networkDetection,
-  DashboardWidget.startButton,
-  DashboardWidget.connectionsCount,
+  DashboardWidget.intranetIp,
+  DashboardWidget.mediaUnlockSmall,
   DashboardWidget.memoryInfo,
+  DashboardWidget.connectionsCount,
+  DashboardWidget.startButton,
 ];
 
 List<DashboardWidget> dashboardWidgetsSafeFromJson(
