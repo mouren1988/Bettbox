@@ -134,24 +134,54 @@ class AppPath {
     );
   }
 
+  // [Gamebox] 上游文件名是 Bettbox*。同目录没有 Gamebox* 时，复制一份再启动，
+  // 任务管理器里的进程名才是 GameboxCore.exe / GameboxHelperService.exe。
+  String? _existingOrCopied(String directory, String stem) {
+    final target = join(directory, '$stem$executableExtension');
+    if (File(target).existsSync()) return target;
+    final upstreamStem = stem.replaceFirst('Gamebox', 'Bettbox');
+    if (upstreamStem == stem) return null;
+    final source = join(directory, '$upstreamStem$executableExtension');
+    if (!File(source).existsSync()) return null;
+    try {
+      File(source).copySync(target);
+      return target;
+    } catch (_) {
+      return source;
+    }
+  }
+
+  // [Gamebox] 解析随包内核路径，按「Dev → Release」回退。
+  //
+  // 背景：Debug 构建装的是 GameboxDevCore.exe / GameboxDevHelperService.exe，
+  // 但上游便携包只带 release 版（BettboxCore.exe / BettboxHelperService.exe），
+  // 同步内核时很容易只剩 release 版。此时 dev 模式会找不到内核 → 起不来。
+  // 所以这里找不到 dev 版时，自动回退到同目录的 release 版。
+  String? _resolveBundled(String directory, String stem) {
+    // 先找同名的（dev 版优先）。
+    final same = _existingOrCopied(directory, stem);
+    if (same != null) return same;
+    // 再回退到 release 版（把 GameboxDev 换成 Gamebox）。
+    final releaseStem = stem.replaceFirst('GameboxDev', 'Gamebox');
+    if (releaseStem == stem) return null;
+    return _existingOrCopied(directory, releaseStem);
+  }
+
   String get bundledCorePath {
     final devWorkspacePath = _devWorkspacePath;
     if (devWorkspacePath != null) {
-      final corePath = join(
-        devWorkspacePath,
-        'libclash',
-        'windows',
-        '${AppIdentity.coreExecutableName}$executableExtension',
+      final corePath = _resolveBundled(
+        join(devWorkspacePath, 'libclash', 'windows'),
+        AppIdentity.coreExecutableName,
       );
-      if (File(corePath).existsSync()) {
-        return corePath;
-      }
+      if (corePath != null) return corePath;
     }
 
-    return join(
-      executableDirPath,
-      '${AppIdentity.coreExecutableName}$executableExtension',
-    );
+    return _resolveBundled(executableDirPath, AppIdentity.coreExecutableName) ??
+        join(
+          executableDirPath,
+          '${AppIdentity.coreExecutableName}$executableExtension',
+        );
   }
 
   String get corePath {
@@ -207,18 +237,15 @@ class AppPath {
   String get helperPath {
     final devWorkspacePath = _devWorkspacePath;
     if (devWorkspacePath != null) {
-      final helperPath = join(
-        devWorkspacePath,
-        'libclash',
-        'windows',
-        '$appHelperService$executableExtension',
+      final helperPath = _resolveBundled(
+        join(devWorkspacePath, 'libclash', 'windows'),
+        appHelperService,
       );
-      if (File(helperPath).existsSync()) {
-        return helperPath;
-      }
+      if (helperPath != null) return helperPath;
     }
 
-    return join(executableDirPath, '$appHelperService$executableExtension');
+    return _resolveBundled(executableDirPath, appHelperService) ??
+        join(executableDirPath, '$appHelperService$executableExtension');
   }
 
   String? get _devWorkspacePath {

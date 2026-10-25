@@ -220,7 +220,7 @@ func handleGetCurrentProfileName() string {
 	return state.CurrentState.CurrentProfileName
 }
 
-func nextHandle(action *Action, result ActionResult) bool {
+func nextHandle(action *Action, result *ActionResult) bool {
 	switch action.Method {
 	case getAndroidVpnOptionsMethod:
 		result.success(handleGetAndroidVpnOptions())

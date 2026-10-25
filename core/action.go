@@ -28,19 +28,19 @@ func (result ActionResult) Json() ([]byte, error) {
 	return data, err
 }
 
-func (result ActionResult) success(data interface{}) {
+func (result *ActionResult) success(data interface{}) {
 	result.Code = 0
 	result.Data = data
 	result.send()
 }
 
-func (result ActionResult) error(data interface{}) {
+func (result *ActionResult) error(data interface{}) {
 	result.Code = -1
 	result.Data = data
 	result.send()
 }
 
-func handleAction(action *Action, result ActionResult) {
+func handleAction(action *Action, result *ActionResult) {
 	defer func() {
 		if r := recover(); r != nil {
 			result.error(fmt.Sprintf("panic: %v", r))
@@ -377,6 +377,13 @@ func handleAction(action *Action, result ActionResult) {
 		result.success(true)
 		handleCrash()
 	default:
-		nextHandle(action, result)
+		// [Gamebox] 未知方法必须回一个错误，不能静默丢弃。
+		// 之前这里只调用 nextHandle() 且不回复，Dart 侧的 completer 永远等不到响应，
+		// 表现为页面一直转圈（尤其是 Dart 已升级、但内核二进制比 Dart 旧的情况：
+		// 例如 Dart 侧有工具箱的 mrsLookup / routeTrace / startSpeedTest，
+		// 旧内核不认识这些方法名，就走到了这里）。
+		if !nextHandle(action, result) {
+			result.error(fmt.Sprintf("unknown method: %s", action.Method))
+		}
 	}
 }

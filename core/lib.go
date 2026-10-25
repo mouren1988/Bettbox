@@ -62,7 +62,7 @@ func invokeAction(paramsChar *C.char, port C.longlong) {
 		Method: action.Method,
 		Port:   i,
 	}
-	go handleAction(action, result)
+	go handleAction(action, &result)
 }
 
 func sendMessage(message Message) {

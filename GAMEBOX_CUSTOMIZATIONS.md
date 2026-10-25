@@ -39,6 +39,7 @@
   - [3.18 安卓端首页默认卡片布局（v3.21 全单宽版）](#318-安卓端首页默认卡片布局v321-全单宽版)
   - [3.19 安卓端默认开关调整（4 项）](#319-安卓端默认开关调整4-项)
   - [3.20 同步上游 v1.19.7 的冲突处理记录](#320-同步上游-v1197-的冲突处理记录)
+  - [3.21 工具箱失效修复（内核未重编译导致永久转圈，2026-10-25）](#321-工具箱失效修复内核未重编译导致永久转圈2026-10-25)
 - [5. 资源文件](#5-资源文件)
 - [6. 注释规范](#6-注释规范)
 - [7. 提交规范](#7-提交规范)
@@ -986,7 +987,7 @@ const List<DashboardWidget> defaultAndroidDashboardWidgets = [
 
 | # | 设置 | UI 路径 | 全局默认 | 安卓默认 | 实际行为说明 |
 |---|---|---|---|---|---|
-| 1 | **查找进程** | 内核配置 → 常规 → 查找进程 | `FindProcessMode.off`（关） | `off`（关） | `ClashConfig.findProcessMode`。Android 端 `state.dart` 原来硬编码 `always`（绕过 `@Default`），已改为统一走 `defaultClashConfig` |
+| 1 | **查找进程** | 内核配置 → 常规 → 查找进程 | `FindProcessMode.always`（开） | `always`（开） | `ClashConfig.findProcessMode`。**2026-10-25 起改为全局默认开启**（见 §3.21 附带修复）。mihomo 在 `find-process-mode=off` 时会把 `helper.FindProcess` 置空 → `metadata.Process` 永远为空 → **PROCESS-NAME / PROCESS-PATH 规则无法匹配**，流量静默落到后面的规则 |
 | 2 | **网络变化时清理 DNS** | 增强工具 → 常规 → 网络变化时清理 DNS | `false` | **`true`** | `AppSettingProps.flushDnsOnNetworkChange`。网络切换时自动 `clashCore.flushDnsCache()`。桌面端字段写 true 不影响（实现里有 `system.isAndroid` 门禁） |
 | 3 | **网速通知** | 增强工具 → 常规 → 网速通知 | `false` | **`true`** | `VpnProps.networkSpeedNotification`。锁屏 / 前台时把网速切到系统通知。桌面端字段写 true 不影响（同上） |
 | 4 | **休眠支持** | 增强工具 → 常规 → 休眠支持 | `true` | **`false`** | `VpnProps.dozeSuspend`。控制是否跟随 Android Doze 模式把流量挂起。详见 3.19 子节「休眠支持说明」 |
@@ -1042,6 +1043,7 @@ const List<DashboardWidget> defaultAndroidDashboardWidgets = [
 - upstream 改了 `VpnProps` 默认值（任何字段），都要重新核对 `VpnProps.safeFromJson` 里 `defaultVpnProps.copyWith(...)` 跟上游是否对齐（防止漏新字段）
 - upstream 给 `clash_config.dart` 加了新的 `FindProcessMode` 值，也要核对 `safeFormJson` 的兜底分支行为
 - 4 个开关的 Android 专用默认都是「用户偏好」，将来想改回上游默认值时，把这段 `if (system.isAndroid)` 条件删掉即可
+- **「查找进程」已不是「Android 专用默认」** —— 2026-10-25 起它是**全局默认 `always`**（§3.21）。上游若改成 `off`，Gamebox 要重新评估 PROCESS-NAME 规则是否还生效
 
 ---
 
@@ -1213,6 +1215,98 @@ Unix socket 名、polkit 规则文件名、salt、`BettboxCore.exe` 二进制名
 > 所以"内核是否同步到 v1.19.33"取决于**仓库里 `core/` 源码是否与上游一致**，
 > 只要 `git diff HEAD upstream/main -- core/` 为空，打出来的 `GameboxCore.exe` 就是 v1.19.33。
 > 反过来说，**不要从任何地方单独拷一个 `*Core.exe` 进仓库** —— 那会绕过源码、绕过 `-ldflags`、也过不了 §3.16 的命名检查。
+
+---
+
+### 3.21 工具箱失效修复（内核未重编译导致永久转圈，2026-10-25）
+
+**症状**：工具箱（网速测试 / 路由追踪 / MRS 速查 / DNS 查询 / iPerf3 / STUN / 本地 Ping / age 加密）
+在 Windows 和 Android 上**页面一直转圈**，永远不出结果。
+
+**根因**：`libclash/` 下的**预编译内核二进制比 Dart 侧代码旧**，不认识工具箱的方法名。
+
+| 端 | 内核产物 | 当时构建时间 | 工具箱 Go 代码加入时间 | 结果 |
+|---|---|---|---|---|
+| Windows | `libclash/windows/BettboxCore.exe` | 2026-10-13 | **2026-10-21**（commit `0c178aaa`）| ❌ 早 8 天，不认识方法名 |
+| Android | `libclash/android/arm64-v8a/libmeta.so` | 2026-10-20 | **2026-10-21**（commit `0c178aaa`）| ❌ 早 1 天，不认识方法名 |
+
+旧内核遇到不认识的 method 会走到 `core/action.go` 的 `default:` 分支，
+而上游那里**只调 `nextHandle()` 且不回任何响应** → Dart 侧 `completer` 永远等不到响应 → 页面永久转圈。
+
+> ⚠️ **两端的调用通道不同，但卡住的机制完全一样**：
+> Windows 是独立进程 + RPC 套接字（`lib/clash/service.dart` 起 `GameboxCore.exe`）；
+> Android 是 FFI 直调 `libmeta.so`（`lib/clash/lib.dart` → `clashFFI.invokeAction`）。
+
+**修复方式**：**重新编译内核**，不改任何工具箱逻辑。
+
+```bash
+# Windows（桌面端）
+dart setup.dart windows --arch amd64 --out core
+
+# Android（arm64-v8a）
+dart setup.dart android --arch arm64 --out core
+```
+
+> ⚠️ **环境坑**：如果系统环境变量 `GO111MODULE=off`，`go mod tidy` 会直接失败
+> （`go: modules disabled by GO111MODULE=off`），构建中断。构建前临时设 `GO111MODULE=on`。
+
+**改动明细**（源码改动极小，共 6 个文件）：
+
+| 文件 | 改动 | 目的 |
+|---|---|---|
+| `core/action.go` | `handleAction` 的 `default:` 分支改为 `if !nextHandle(...) { result.error("unknown method: %s") }` | **核心修复**：未知方法必须回错误，不能静默丢弃 |
+| `core/action.go` / `core/lib.go` / `core/lib_android.go` / `core/lib_other.go` / `core/server.go` | `handleAction` / `nextHandle` 的 `result` 参数从值传递改为**指针**（`*ActionResult`）| `ActionResult.send()` 是值接收者，原写法下 `default:` 分支即使调 `result.error()` 也**回不到调用方**。改成指针后错误才真正发得出去 |
+| `lib/clash/core.dart` | 新增 `_tryDecode()`；`_toolboxJson` / `getCoreStatus` / `startSpeedTest` / `probeSpeedTest` / `getSpeedTestServers` / `startStunTest` / `startIperfServer` / `startIperfClient` / `startLocalPing` 全部改用它 | 内核返回非 JSON（如 `unknown method: xxx`）时 `json.decode` 抛 `FormatException`，异常打断调用方 `await`，loading 标志来不及复位 → **同样表现为转圈**。现在解析失败返回 `null` / `{'error': ...}`，页面能显示错误 |
+| `lib/common/path.dart` | 新增 `_existingOrCopied()` / `_resolveBundled()`；`bundledCorePath` / `helperPath` 改用它们 | 见下方「Dev→Release 回退」 |
+
+> `core/action.go` 的 `default:` 分支改动**不改变上游行为** —— 上游对已知方法的处理完全没动，
+> 只是把「未知方法静默丢弃」补成「回一个明确的错误」。这是本项目**唯一**的 Go 侧逻辑改动。
+
+#### Dev→Release 内核回退（`lib/common/path.dart`）
+
+**背景**：Debug 构建装的是 `GameboxDevCore.exe` / `GameboxDevHelperService.exe`，
+但上游便携包只带 release 版（`BettboxCore.exe` / `BettboxHelperService.exe`），
+同步内核时很容易只剩 release 版 → dev 模式找不到内核 → 起不来。
+
+新增两个私有方法：
+
+- `_existingOrCopied(directory, stem)`：找同名的；没有就把 `Bettbox*` 复制一份成 `Gamebox*`
+  （让任务管理器里的进程名是 `GameboxCore.exe` / `GameboxHelperService.exe`）
+- `_resolveBundled(directory, stem)`：先找同名的（dev 优先），再回退到 release 版（`GameboxDev` → `Gamebox`）
+
+> 这两个方法**曾经存在**于 Gamebox 自己的分支（commit `870ed5b7`，分支 `gamebox-backup` / `fix/replay-gamebox-patches`），
+> 在合并上游（`53c62554`）时丢失 —— 合并后 `lib/common/path.dart` 与上游**逐字节一致**。
+> 本次按原逻辑恢复，未改上游任何行为。
+
+#### 验证结果（2026-10-25）
+
+| 项 | 结果 |
+|---|---|
+| Windows 内核符号扫描 | HIT `core/toolbox` + 12 个 `Handle*` 函数 ✅ |
+| Android 内核符号扫描 | HIT `core/toolbox` + 12 个 `Handle*` 函数 ✅ |
+| Android `go vet`（android/arm64 交叉编译）| 通过 ✅ |
+| Windows `go build`（CGO_ENABLED=0）| 通过 ✅ |
+| `gofmt`（改动的 Go 文件）| 通过 ✅ |
+| `flutter analyze` | **0 error** ✅ |
+| `flutter test` 全量 | **13 failing** —— 与基线**完全相同**（media_unlock / script / vpn_props / code_forge，均为既有失败）✅ |
+| APK 内 `lib/arm64-v8a/libmeta.so` | 75816904 字节，工具箱符号齐全 ✅ |
+
+> **符号扫描要用 Go 符号名，不能用方法名字符串** ——
+> Go 编译器会把短字符串内联进指令流，`routeTrace` 这类方法名常量**不一定**以字面量出现在二进制里，
+> 会误判成「MISS」。符号名（`HandleRouteTrace` / `core/toolbox`）才是可靠依据。
+
+#### ⚠️ 重要：`libclash/` 在 `.gitignore` 里
+
+```
+.gitignore:72:  /libclash/
+```
+
+所以**重新编译出来的内核二进制不会进 git**，只在本机生效。
+`git status` 看不到内核变化 —— 这是正常的，不是构建失败。
+
+如果要让内核二进制跟着仓库走（给 CI 或同事用），需要把 `libclash/android/`、`libclash/windows/`
+从 gitignore 放出来。**注意**：这与「内核是从 `core/` 源码现场编译、不入库」的既有约定（见 §3.20）
+是冲突的，二者只能选其一 —— 当前约定是**不入库**。
 
 ---
 

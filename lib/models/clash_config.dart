@@ -742,9 +742,13 @@ abstract class ClashConfig with _$ClashConfig {
     List<String> skipAuthPrefixes,
     @Default(LogLevel.error) @JsonKey(name: 'log-level') LogLevel logLevel,
     @Default(false) bool ipv6,
-    // [Gamebox] 查找进程默认关闭。v1.20.0 起 Gamebox 与上游一致（off）。
-    // 同步上游：保留 off。
-    @Default(FindProcessMode.off)
+    // [Gamebox] 查找进程默认开启（所有平台）。
+    //
+    // 原因：mihomo 在 find-process-mode=off 时会把 helper.FindProcess 置空，
+    // metadata.Process 永远为空 → PROCESS-NAME / PROCESS-PATH 规则
+    // 无法匹配，流量会静默落到后面的规则（见
+    // core/Clash.Meta/tunnel/tunnel.go 的 FindProcessMode() switch）。
+    @Default(FindProcessMode.always)
     @JsonKey(
       name: 'find-process-mode',
       unknownEnumValue: FindProcessMode.always,
@@ -793,17 +797,14 @@ abstract class ClashConfig with _$ClashConfig {
 
   factory ClashConfig.safeFormJson(Map<String, Object?>? json) {
     if (json == null) {
-      // [Gamebox] Android 的兜底分支与 @Default 保持一致 (off)，
-      // 避免「patchClashConfig 字段缺失/解析失败 → Android 强开 always」。
-      // 与上游 defaultClashConfig 行为一致。同步时如果上游给 Android
-      // 改成 always，记得把这条分支也同步更新。
+      // [Gamebox] 兜底统一用 defaultClashConfig，
+      // 与 @Default(FindProcessMode.always) 保持一致。
       return defaultClashConfig;
     }
     try {
       return ClashConfig.fromJson(json);
     } catch (_) {
-      // [Gamebox] 同上：解析失败兜底也用 defaultClashConfig，不再单独
-      // 给 Android 写 always（与 @Default off 不一致是个隐藏 bug）。
+      // [Gamebox] 同上：解析失败兜底也用 defaultClashConfig。
       return defaultClashConfig;
     }
   }

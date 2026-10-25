@@ -107,11 +107,11 @@ func startServer(arg string) {
 			Method: action.Method,
 		}
 
-		go handleAction(action, result)
+		go handleAction(action, &result)
 	}
 }
 
-func nextHandle(action *Action, result ActionResult) bool {
+func nextHandle(action *Action, result *ActionResult) bool {
 	return false
 }
 

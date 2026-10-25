@@ -14,6 +14,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 
+/// 安全解析内核返回值。
+///
+/// 内核在不认识某个方法时会直接回一段纯文本（例如 `unknown method: xxx`），
+/// 这不是合法的 JSON。裸 [json.decode] 会抛 FormatException，异常会打断调用方
+/// 的 await，导致页面上的 loading 标志来不及复位，表现为一直转圈。
+///
+/// 这里解析失败时返回 null，由各调用方转成可见的错误提示。
+Object? _tryDecode(String? value) {
+  if (value == null || value.isEmpty) return null;
+  try {
+    return json.decode(value);
+  } on FormatException {
+    return null;
+  }
+}
+
 @visibleForTesting
 List<Group> buildGroups(String proxiesRaw, List<ExternalProvider> providers) {
   final decoded = json.decode(proxiesRaw);
@@ -461,7 +477,7 @@ class ClashCore {
     if (value.isEmpty) {
       return null;
     }
-    final decoded = json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! Map) {
       return null;
     }
@@ -472,7 +488,7 @@ class ClashCore {
     if (value.isEmpty) {
       return null;
     }
-    final decoded = json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! Map) {
       return null;
     }
@@ -508,7 +524,7 @@ class ClashCore {
       json.encode({'proxy': proxy, 'search': search}),
     );
     if (value.isEmpty) return const [];
-    final decoded = json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! List) return const [];
     return [
       for (final item in decoded)
@@ -531,7 +547,7 @@ class ClashCore {
     if (value.isEmpty) {
       return null;
     }
-    final decoded = json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! Map) {
       return null;
     }
@@ -546,7 +562,7 @@ class ClashCore {
     final value = await clashInterface.startIperfServer(
       json.encode({'port': port}),
     );
-    final decoded = value.isEmpty ? null : json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! Map) return const IperfServerInfo(error: 'listen');
     return IperfServerInfo.fromJson(Map<String, dynamic>.from(decoded));
   }
@@ -574,7 +590,7 @@ class ClashCore {
       }),
       Duration(seconds: options.duration + 45),
     );
-    final decoded = value.isEmpty ? null : json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! Map) return null;
     return IperfState.fromJson(Map<String, dynamic>.from(decoded));
   }
@@ -599,7 +615,7 @@ class ClashCore {
       Duration(milliseconds: options.count * options.interval) +
           const Duration(seconds: 30),
     );
-    final decoded = value.isEmpty ? null : json.decode(value);
+    final decoded = _tryDecode(value);
     if (decoded is! Map) return null;
     return LocalPingState.fromJson(Map<String, dynamic>.from(decoded));
   }
@@ -614,8 +630,14 @@ class ClashCore {
   }) async {
     final value = await clashInterface.toolboxInvoke(method, data: data);
     if (value.isEmpty) return {};
-    final decoded = json.decode(value);
-    return decoded is Map ? Map<String, Object?>.from(decoded) : {};
+    // 内核可能直接返回一段纯文本错误（例如内核比 Dart 旧、不认识这个方法时
+    // 回的 "unknown method: xxx"），这不是 JSON，直接 decode 会抛 FormatException。
+    // 抛出去会让调用页面的 await 被打断，状态标志来不及复位，表现为一直转圈。
+    // 所以这里解析失败时把它当成错误信息返回，由页面显示。
+    final decoded = _tryDecode(value);
+    if (decoded is Map) return Map<String, Object?>.from(decoded);
+    if (decoded is String) return {'error': decoded};
+    return {'error': value};
   }
 
   Future<RouteTraceResult> routeTrace({
