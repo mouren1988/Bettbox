@@ -1,14 +1,13 @@
 #include "flutter_window.h"
 
-#include <d3d11.h>
-#include <dxgi.h>
+#include <flutter_windows.h>
 #include <shlobj.h>
 
-#include <cwchar>
 #include <optional>
 #include <string>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "startup_trace.h"
 
 // [Gamebox] 图标清理只用自己的注册表项。上游是 Software\Bettbox，
 // 继续用那个键会删掉官方客户端的图标设置。
@@ -173,34 +172,46 @@ constexpr const char kClipboardChannel[] = "clipboard_ext";
 constexpr const char kPasteMethod[] = "paste";
 constexpr const wchar_t kFlutterWindowProp[] = L"GameboxFlutterWindow";
 
+// 可缩放（WS_THICKFRAME）且未最大化时，按屏幕坐标判断是否落在边缘缩放带内。
+// 不在边缘返回 HTNOWHERE。
+LRESULT ResizeHitTest(HWND hwnd, LPARAM lparam) {
+  if (!hwnd || ::IsZoomed(hwnd) ||
+      !(::GetWindowLongW(hwnd, GWL_STYLE) & WS_THICKFRAME)) {
+    return HTNOWHERE;
+  }
+  RECT rect;
+  if (!::GetWindowRect(hwnd, &rect)) {
+    return HTNOWHERE;
+  }
+  // GetDpiForWindow 是 Win10 才有的 API；客户机有 Windows 7。
+  UINT dpi = FlutterDesktopGetDpiForHWND(hwnd);
+  if (dpi == 0) {
+    dpi = 96;
+  }
+  const int border = MulDiv(6, static_cast<int>(dpi), 96);
+  const int x = static_cast<short>(LOWORD(lparam));
+  const int y = static_cast<short>(HIWORD(lparam));
+  const bool left = x < rect.left + border;
+  const bool right = x >= rect.right - border;
+  const bool top = y < rect.top + border;
+  const bool bottom = y >= rect.bottom - border;
+  if (top && left) return HTTOPLEFT;
+  if (top && right) return HTTOPRIGHT;
+  if (bottom && left) return HTBOTTOMLEFT;
+  if (bottom && right) return HTBOTTOMRIGHT;
+  if (left) return HTLEFT;
+  if (right) return HTRIGHT;
+  if (top) return HTTOP;
+  if (bottom) return HTBOTTOM;
+  return HTNOWHERE;
+}
+
 }  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
 FlutterWindow::~FlutterWindow() {}
-
-namespace {
-
-// [Gamebox] 虚拟机经常没有硬件显卡。Direct3D 11 建不起来时，Flutter 窗口会创建失败并立刻退出。
-bool HardwareD3D11Available() {
-  ID3D11Device* device = nullptr;
-  ID3D11DeviceContext* context = nullptr;
-  D3D_FEATURE_LEVEL feature_level = D3D_FEATURE_LEVEL_9_1;
-  const HRESULT hr = D3D11CreateDevice(
-      nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0,
-      D3D11_SDK_VERSION, &device, &feature_level, &context);
-  const bool usable = SUCCEEDED(hr) && feature_level >= D3D_FEATURE_LEVEL_9_3;
-  if (context) {
-    context->Release();
-  }
-  if (device) {
-    device->Release();
-  }
-  return usable;
-}
-
-}  // namespace
 
 void FlutterWindow::SubclassViewWindow() {
   if (!flutter_controller_ || !flutter_controller_->view()) {
@@ -252,6 +263,11 @@ LRESULT CALLBACK FlutterWindow::ViewWindowProc(HWND window, UINT message,
   }
 
   WNDPROC original = self->original_view_proc_;
+  // Flutter 内容窗口铺满了整个顶层窗口；边缘交给父窗口做缩放命中。
+  if (message == WM_NCHITTEST &&
+      ResizeHitTest(::GetAncestor(window, GA_ROOT), lparam) != HTNOWHERE) {
+    return HTTRANSPARENT;
+  }
   if (message == WM_PASTE) {
     self->NotifyPaste();
     return 0;
@@ -272,24 +288,15 @@ bool FlutterWindow::OnCreate() {
   // TODO: Revert legacy shortcut and registry overrides once; remove in a future release.
   CleanupLegacyIconSettings();
 
-  // [Gamebox] 没有可用的硬件显卡时，先切到 WARP 软件渲染，再创建 Flutter 视图。
-  if (!HardwareD3D11Available()) {
-    ::SetEnvironmentVariableW(L"ANGLE_DEFAULT_PLATFORM", L"warp");
-  }
-
   RECT frame = GetClientArea();
 
   flutter_controller_ = std::make_unique<flutter::FlutterViewController>(
       frame.right - frame.left, frame.bottom - frame.top, project_);
   if (!flutter_controller_->engine() || !flutter_controller_->view()) {
-    flutter_controller_.reset();
-    ::SetEnvironmentVariableW(L"ANGLE_DEFAULT_PLATFORM", L"warp");
-    flutter_controller_ = std::make_unique<flutter::FlutterViewController>(
-        frame.right - frame.left, frame.bottom - frame.top, project_);
-    if (!flutter_controller_->engine() || !flutter_controller_->view()) {
-      return false;
-    }
+    StartupTrace("FlutterViewController failed");
+    return false;
   }
+  StartupTrace("FlutterViewController ok");
   RegisterPlugins(flutter_controller_->engine());
 
   clipboard_channel_ =
@@ -301,7 +308,7 @@ bool FlutterWindow::OnCreate() {
   SubclassViewWindow();
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
-
+    StartupTrace("engine first frame");
   });
 
   flutter_controller_->ForceRedraw();
@@ -323,11 +330,17 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
-  // [Gamebox] 登录小窗铺满整个窗口。否则 window_manager 在 Windows 10 上
-  // 会留出一圈边框，裁圆角之后这圈就变成白底。
-  if (message == WM_NCCALCSIZE && wparam &&
-      GetProp(hwnd, L"GameboxLoginRound")) {
+  // [Gamebox] 非最大化时整个窗口都是客户区。window_manager 的隐藏标题栏会在
+  // 左右下留 8px 非客户区当缩放边框，老核显 / 部分驱动会把这圈画成白边。
+  // 最大化、全屏仍交给 window_manager。边缘缩放由下面的 WM_NCHITTEST 接管。
+  if (message == WM_NCCALCSIZE && wparam && !::IsZoomed(hwnd)) {
     return 0;
+  }
+  if (message == WM_NCHITTEST) {
+    const LRESULT hit = ResizeHitTest(hwnd, lparam);
+    if (hit != HTNOWHERE) {
+      return hit;
+    }
   }
 
   if (flutter_controller_) {

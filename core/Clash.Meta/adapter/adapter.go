@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/common/atomic"
-	"github.com/metacubex/mihomo/common/queue"
 	"github.com/metacubex/mihomo/common/utils"
-	"github.com/metacubex/mihomo/common/xsync"
 	"github.com/metacubex/mihomo/component/ca"
 	C "github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/log"
@@ -28,14 +26,14 @@ const (
 
 type internalProxyState struct {
 	alive   atomic.Bool
-	history *queue.Queue[C.DelayHistory]
+	history delaySlot
 }
 
 type Proxy struct {
 	C.ProxyAdapter
 	alive   atomic.Bool
-	history *queue.Queue[C.DelayHistory]
-	extra   xsync.Map[string, *internalProxyState]
+	history delaySlot
+	extra   proxyStates
 }
 
 // Adapter implements C.Proxy
@@ -185,8 +183,7 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
 
 		state, _ := p.extra.LoadOrStoreFn(url, func() *internalProxyState {
 			return &internalProxyState{
-				history: queue.New[C.DelayHistory](defaultHistoriesNum),
-				alive:   atomic.NewBool(true),
+				alive: atomic.NewBool(true),
 			}
 		})
 
@@ -271,8 +268,8 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
 			start = second
 		} else {
 			if strings.HasPrefix(url, "http://") {
-				log.Warnln("%s failed to get the second response from %s: %v", p.Name(), url, ignoredErr)
-				log.Warnln("It is recommended to use HTTPS for provider.health-check.url and group.url to ensure better reliability. Due to some proxy providers hijacking test addresses and not being compatible with repeated HEAD requests, using HTTP may result in failed tests.")
+				log.Infoln("%s failed to get the second response from %s: %v", p.Name(), url, ignoredErr)
+				log.Infoln("It is recommended to use HTTPS for provider.health-check.url and group.url to ensure better reliability. Due to some proxy providers hijacking test addresses and not being compatible with repeated HEAD requests, using HTTP may result in failed tests.")
 			}
 		}
 	}
@@ -290,7 +287,6 @@ func (p *Proxy) URLTest(ctx context.Context, url string, expectedStatus utils.In
 func NewProxy(adapter C.ProxyAdapter) *Proxy {
 	return &Proxy{
 		ProxyAdapter: adapter,
-		history:      queue.New[C.DelayHistory](defaultHistoriesNum),
 		alive:        atomic.NewBool(true),
 	}
 }

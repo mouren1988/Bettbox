@@ -458,8 +458,8 @@ extension AccessControlExt on AccessControl {
 @freezed
 abstract class WindowProps with _$WindowProps {
   const factory WindowProps({
-    @Default(910) double width,
-    @Default(620) double height,
+    @Default(827) double width,
+    @Default(604) double height,
     double? top,
     double? left,
     @Default(false) bool isPinned,

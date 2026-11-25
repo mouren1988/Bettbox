@@ -177,6 +177,7 @@ class ApplicationState extends ConsumerState<Application>
         await window!.showForTransition();
         await _waitPresentedFrames(2);
         await window!.moveTo(origin);
+        startupTrace('main window moved back to $origin');
       }
     }
 

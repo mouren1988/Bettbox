@@ -15,6 +15,26 @@ import 'package:window_manager/window_manager.dart';
 class Window {
   // [Gamebox] 登录小窗固定宽 360、高 420，用来看实际窗口效果。
   static const loginSize = Size(360, 420);
+  // [Gamebox] 主界面默认尺寸对齐 Bettbox 新版实际使用尺寸；用户拖拽后按记住的尺寸打开。
+  static const mainDefaultSize = Size(827, 604);
+  static const mainMinimumSize = Size(380, 400);
+  // 旧版每次强制写入的尺寸，读到它说明用户没拖过，按新默认打开。
+  static const _legacyForcedMainSize = Size(910, 620);
+
+  static bool isMainWindowSize(Size size) =>
+      size.width.isFinite &&
+      size.height.isFinite &&
+      size.width >= mainMinimumSize.width &&
+      size.height >= mainMinimumSize.height;
+
+  Size _savedMainSize() {
+    final props = globalState.config.windowProps;
+    final saved = Size(props.width, props.height);
+    if (!isMainWindowSize(saved) || saved == _legacyForcedMainSize) {
+      return mainDefaultSize;
+    }
+    return saved;
+  }
 
   Future<void> init() async {
     final props = globalState.config.windowProps;
@@ -50,6 +70,7 @@ class Window {
       // [Gamebox] 引擎就绪后只显示登录小窗。这里不能走 Window.show，控制器还没建好。
       await windowManager.show();
       await windowManager.focus();
+      startupTrace('login window shown');
       // [Gamebox] 登录小窗四角稍微收圆。进入主界面前会取消。
       _applyLoginWindowShape(rounded: true);
     });
@@ -100,16 +121,14 @@ class Window {
   }
 
   Future<void> showAsMainWindow() async {
+    startupTrace('showAsMainWindow');
     // [Gamebox] 主界面恢复直角，避免登录圆角把大窗口裁掉。
     _applyLoginWindowShape(rounded: false);
-    final props = globalState.config.windowProps;
     await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     await windowManager.setResizable(true);
-    await windowManager.setMinimumSize(const Size(380, 400));
+    await windowManager.setMinimumSize(mainMinimumSize);
     await windowManager.setMaximumSize(const Size(10000, 10000));
-    // [Gamebox] 主界面永远用上游默认尺寸 910x620，不读 props。
-    // props.width/height 可能是用户拖登录窗时存的 360x420，不应污染主界面。
-    await windowManager.setSize(const Size(910, 620));
+    await windowManager.setSize(_savedMainSize());
     await _placeSavedWindow();
   }
 
@@ -225,6 +244,7 @@ HWND? _findGameboxWindow() {
 void _applyLoginWindowShape({required bool rounded}) {
   if (!Platform.isWindows) return;
   final hwnd = _findGameboxWindow();
+  startupTrace('applyLoginWindowShape rounded=$rounded hwnd=${hwnd != null}');
   if (hwnd == null) return;
   using((arena) {
     final key = arena.pcwstr('GameboxLoginRound');

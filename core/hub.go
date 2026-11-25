@@ -1227,12 +1227,6 @@ func init() {
 			Data: info,
 		})
 	}
-	executor.DefaultProviderLoadedHook = func(providerName string) {
-		sendMessage(Message{
-			Type: LoadedMessage,
-			Data: providerName,
-		})
-	}
 }
 
 const maxRequestHistory = 512

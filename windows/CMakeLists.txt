@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(Gamebox LANGUAGES CXX)
 
-# [Gamebox] 主程序文件名。上游是 Bettbox。下面把内核安装成 GameboxCore.exe，源文件仍是 BettboxCore.exe。
+# [Gamebox] 主程序文件名。上游是 Bettbox。内核/Helper 现由 setup.dart 直接编成 Gamebox* 文件名。
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "Gamebox")
@@ -92,11 +92,16 @@ set(CLASH_DIR "../libclash/windows")
 #   set(CLASH_DIR "../libclash/windows/x86")
 # endif()
 
-install(PROGRAMS "${CLASH_DIR}/BettboxCore.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  RENAME "GameboxCore.exe"
+# Release/Profile：setup.dart 输出 GameboxCore / GameboxHelperService
+install(PROGRAMS "${CLASH_DIR}/GameboxCore.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
 
+install(PROGRAMS "${CLASH_DIR}/GameboxHelperService.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  CONFIGURATIONS Profile;Release
+  COMPONENT Runtime)
+
+# Debug：仍兼容旧的 BettboxDev*（若存在）
 install(PROGRAMS "${CLASH_DIR}/BettboxDevCore.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   RENAME "GameboxDevCore.exe"
   CONFIGURATIONS Debug
@@ -105,16 +110,6 @@ install(PROGRAMS "${CLASH_DIR}/BettboxDevCore.exe" DESTINATION "${INSTALL_BUNDLE
 install(PROGRAMS "${CLASH_DIR}/BettboxDevHelperService.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   RENAME "GameboxDevHelperService.exe"
   CONFIGURATIONS Debug
-  COMPONENT Runtime)
-
-install(PROGRAMS "${CLASH_DIR}/BettboxCore.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  RENAME "GameboxCore.exe"
-  CONFIGURATIONS Profile;Release
-  COMPONENT Runtime)
-
-install(PROGRAMS "${CLASH_DIR}/BettboxHelperService.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-  RENAME "GameboxHelperService.exe"
-  CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
 
 install(FILES "WindowsLoopbackManager.exe" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"

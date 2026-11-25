@@ -28,6 +28,11 @@ ReceivePort? _messageReceiverPort;
 Future<void> main(List<String> args) async {
   globalState.isService = false;
   WidgetsFlutterBinding.ensureInitialized();
+  startupTrace('main args=$args');
+  PlatformDispatcher.instance.onError = (error, stack) {
+    startupTrace('uncaught: $error\n$stack');
+    return false;
+  };
 
   if (system.isDesktop &&
       (args.contains('--exit') || args.contains('--restart'))) {
@@ -53,6 +58,7 @@ Future<void> main(List<String> args) async {
   PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024;
 
   final version = await system.version;
+  startupTrace('initApp + preload begin');
   // [Gamebox] 同样加超时：globalState.initApp / clashCore.preload 任一个挂死会冻住整个
   // Flutter 启动流程。给整个 wait 一个 10 秒兜底,Android 上即使初化没全跑完,也确保
   // runApp() 一定要执行到,主界面先亮。
@@ -63,6 +69,7 @@ Future<void> main(List<String> args) async {
     ]).timeout(
       const Duration(seconds: 10),
       onTimeout: () {
+        startupTrace('initApp + preload TIMEOUT 10s');
         commonPrint.error(
           'initApp / clashCore.preload timed out after 10s, continuing startup',
         );
@@ -70,8 +77,10 @@ Future<void> main(List<String> args) async {
       },
     );
   } catch (e) {
+    startupTrace('initApp + preload failed: $e');
     commonPrint.error('initApp / clashCore.preload failed: $e');
   }
+  startupTrace('initApp + preload end; initializeUI begin');
 
   // [Gamebox] uiManager.initializeUI 内部开 Isolate.run 拷 UI 资源。
   // 在某些 Android 设备 / 模拟器上 Isolate.run 可能挂住（不返回也不抛），
@@ -88,8 +97,10 @@ Future<void> main(List<String> args) async {
       },
     );
   } catch (e) {
+    startupTrace('initializeUI failed: $e');
     commonPrint.error('Failed to initialize UI: $e');
   }
+  startupTrace('initializeUI end');
 
   await _runApp();
 }
@@ -111,7 +122,9 @@ Future<void> _sendControlCommand(String command) async {
 }
 
 Future<void> _runApp() async {
+  startupTrace('ensureRustLib begin');
   await ensureRustLib();
+  startupTrace('ensureRustLib end');
 
   if (system.isAndroid) {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -119,11 +132,19 @@ Future<void> _runApp() async {
   await android?.init();
 
   await window?.init();
+  startupTrace('window.init end');
   if (system.isWindows) {
     clipboardExt.init();
   }
   HttpOverrides.global = BettboxHttpOverrides();
   runApp(ProviderScope(retry: (_, _) => null, child: const Application()));
+  startupTrace('runApp called');
+  WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) {
+    final view = PlatformDispatcher.instance.implicitView;
+    startupTrace(
+      'first frame rasterized size=${view?.physicalSize} dpr=${view?.devicePixelRatio}',
+    );
+  });
 }
 
 @pragma('vm:entry-point')

@@ -6,10 +6,33 @@
 > 3. 提供完整的"同步上游 / rebase / 解决冲突"操作流程
 > 4. 任何修改都要带 `// [Gamebox]` 注释，并同步更新本文件
 
-**当前 `gamebox` 分支 HEAD**：`229b5883`（已推送到 `origin/gamebox`；merge 了 `origin/main` v1.19.7 = `1fb8806f`，同步过程见 §3.20）
+**当前 `gamebox` 分支 HEAD**：`da3dc2ce`（已推送到 `origin/gamebox`；仍包含 `origin/main` v1.19.7 = `1fb8806f`，同步过程见 §3.20）
 **当前 `main` 分支 HEAD**：`1fb8806f`（严格等于 `upstream/main`，**不可变**）
 **当前发布版本**：`pubspec.yaml` = `1.19.7+2026102201`；`version.json` = `1.19.7+2026102201`（✅ **已同步**，2026-10-23）
 **当前发布时间**：`2026-10-20`
+
+<details>
+<summary><b>gamebox 分支最近提交（截至 2026-10-25）</b></summary>
+
+| commit | 说明 | 文档章节 |
+|---|---|---|
+| `da3dc2ce` | 修复工具箱永久转圈（内核未重编译）+ 查找进程默认开启 + Dev→Release 回退 | §3.21 |
+| `a4cfe500` | 安卓首页默认布局改为全单宽（v3.21）| §3.18 |
+| `73b07192` | 同步 `version.json` 到 `1.19.7+2026102201` + 记录 4 个 warning 明细 | §3.20 |
+| `6bbcad34` | 同步文档（验证基线 + `version.json` 被 CI 改写的坑）| §3.20 |
+| `229b5883` | Merge `origin/gamebox`（`version.json` 由 CI 自动更新）| §3.20 |
+
+> ⚠️ **内核二进制不在版本控制内** —— `libclash/` 被 `.gitignore` 排除（见 §3.21）。
+> 从仓库 clone 后**必须自己重新编译内核**，否则工具箱会永久转圈：
+>
+> ```bash
+> dart setup.dart windows --arch amd64 --out core    # Windows
+> dart setup.dart android --arch arm64 --out core    # Android
+> ```
+>
+> 另注：若系统环境变量是 `GO111MODULE=off`，构建会失败，需临时设为 `on`。
+
+</details>
 
 ---
 
@@ -37,7 +60,7 @@
   - [3.16 托盘退出通知面板下线（修在线设备不立即归零）](#316-托盘退出通知面板下线修在线设备不立即归零)
   - [3.17 显示文字全部从 Bettbox 改为 Gamebox + 删启动 splash + 登录页居中（2026-10-20）](#317-显示文字全部从-bettbox-改为-gamebox--删启动-splash--登录页居中2026-10-20)
   - [3.18 安卓端首页默认卡片布局（v3.21 全单宽版）](#318-安卓端首页默认卡片布局v321-全单宽版)
-  - [3.19 安卓端默认开关调整（4 项）](#319-安卓端默认开关调整4-项)
+  - [3.19 安卓端默认开关调整（4 项）](#319-安卓端默认开关调整4-项)  ← 2026-10-25 起实际 3 项（见 §3.21）
   - [3.20 同步上游 v1.19.7 的冲突处理记录](#320-同步上游-v1197-的冲突处理记录)
   - [3.21 工具箱失效修复（内核未重编译导致永久转圈，2026-10-25）](#321-工具箱失效修复内核未重编译导致永久转圈2026-10-25)
 - [5. 资源文件](#5-资源文件)
@@ -280,8 +303,10 @@ find . -name "*.orig" -o -name "*.rej" 2>/dev/null
 # 删掉: rm -f $(find . -name "*.orig")
 
 # 2. 跑代码扫描确认所有 [Gamebox] 段还在
-grep -rn "\[Gamebox\]" lib/ windows/ arb/ | wc -l
+grep -rn "\[Gamebox\]" lib/ windows/ arb/ core/ | wc -l
 # 应大于 0(具体数见 §3 各项)
+# ⚠️ 2026-10-25 起 core/ 也有 [Gamebox] 标记了(§3.21 的 core/action.go),
+#    所以扫描范围要带上 core/，否则会漏掉 Go 侧的定制。
 
 # 3. 跑 flutter analyze
 flutter analyze --no-pub
@@ -305,17 +330,22 @@ flutter analyze --no-pub
 
 | 项 | 命令 | 期望 |
 |---|---|---|
-| **内核目录与上游一致** | `git diff --stat HEAD <upstream-main> -- core/` | **输出为空**。`core/` 是 in-tree vendored（不是 submodule，仓库里没有 `.gitmodules`），所以 Gamebox 侧一旦有本地改动就会在这里显示。空 = 内核与上游逐字节相同 |
+| **内核目录与上游一致** | `git diff --stat HEAD <upstream-main> -- core/` | **应为空**。`core/` 是 in-tree vendored（不是 submodule，仓库里没有 `.gitmodules`），所以 Gamebox 侧一旦有本地改动就会在这里显示。<br>⚠️ **例外**：2026-10-25 起有 **5 个已知 Gamebox 定制文件**（§3.21），此时应恰好只显示这 5 个 —— 多一个少一个都要查 |
 | 内核文件数一致 | `git ls-tree -r --name-only HEAD -- core/ \| Measure-Object -Line` | 与上游同一数字（v1.19.7 时是 **1096**）|
 
-> ⚠ **为什么内核这条要单独拎出来**：Gamebox 对 `core/` **没有任何定制**（不要在 `core/` 里改代码），
-> 内核版本完全由「是否把上游 `core/` 整棵树带过来」决定。
+> ⚠ **为什么内核这条要单独拎出来**：Gamebox 对 `core/` 的定制**极少**（除 §3.21 那 5 个文件外不要在 `core/` 里改代码），
+> 内核版本完全由「是否把上游 `core/Clash.Meta/` 整棵树带过来」决定。
 > 一次 merge 如果只带了 `lib/` 没带 `core/`（或反过来 core 冲突被误跳过），
 > Dart 侧 `flutter analyze` 照样 0 error —— **只有这条 diff 能发现**。
 >
+> ⚠️ **2026-10-25 更新**：不再是「零定制」。§3.21 改了 `core/action.go` 等 5 个文件
+> （让未知方法回错误、避免 Dart 侧永久转圈）。核对时用
+> `git diff upstream/main -- core/Clash.Meta/` 应为**空**（真正的上游内核树一致），
+> 而 `git diff upstream/main -- core/` 应恰好只有那 5 个文件。清单见 §3.20「core/ 定制化现状」。
+>
 > 内核版本号本身在 `core/Clash.Meta/constant/version.go` 里是空的（`Version = ""`），
 > 构建时才通过 `-ldflags` 注入，所以**别指望在源码里 grep 到 `v1.19.33`**，
-> 要确认版本就比对 `core/` 整棵树，或看构建产物的版本输出。
+> 要确认版本就比对 `core/Clash.Meta/` 整棵树，或看构建产物的版本输出。
 
 **再验 Dart 侧定制**：
 
@@ -668,6 +698,48 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 - upstream 如果进一步改 `main.cpp` 的 Impeller 配置(比如 Flutter 3.x 之后某天移除 Skia),**跟 upstream 走**
 - upstream 如果重新加回 `BETTBOX_COMPATIBLE_BUILD` 相关 cmake 配置,**不跟**,Gamebox 仍保持无条件禁 Impeller
 
+#### 老核显黑屏 → 改用 Flutter 3.50.1 构建（2026-11-25）
+
+**现象**：i3 M330 / M370（2010 代 Intel HD，D3D11 Feature Level 10_0，**Windows 7 6.1.7600**）客户机打开后窗口全黑。runner 里不要用 `GetDpiForWindow` 等 Win10 才有的 API，用 `FlutterDesktopGetDpiForHWND`。
+
+**根因是 Flutter 引擎版本，不是 Gamebox 代码**。实测：原版 Bettbox 1.19.7 compatible（Flutter 3.47.7）黑屏，原版 Bettbox 1.20.0 compatible（Flutter 3.50.1）正常；两版上游 `windows/runner` 完全相同。Gamebox 用 3.47.7 构建 → 同样黑屏；改用 3.50.1 构建后客户机正常。
+
+- 曾尝试启动时探测 Feature Level 并设 `ANGLE_DEFAULT_PLATFORM=warp`：**无效，已整段撤回**（`angle_compat.*` 已删，`OnCreate` 恢复上游写法）。
+- 本机 Flutter 3.50.1 装在 `C:\flutter-3.50.1`（`C:\flutter` 仍是 3.47.7）。打包前先：`$env:PATH = "C:\flutter-3.50.1\bin;" + $env:PATH`，并 `flutter --version` 确认。
+- `--compatible` 只管老 CPU（内核 `GOAMD64=v1`），与本问题无关。
+
+**启动日志**：配置目录 `%APPDATA%\com.appshub\Gamebox\startup.log`（与 `config.json` 同目录，只追加不清理）。原生 `windows/runner/startup_trace.cpp` 记录系统版本、显卡、D3D11 Feature Level、视图创建、首帧；Dart `lib/common/startup_trace.dart` 记录启动各步骤和未捕获异常。客户机再出黑屏/卡启动时让其回传此文件。
+
+#### 主界面白边 → 非最大化时整窗都是客户区（2026-11-25）
+
+**现象**：上面的老核显客户机，主界面四周一圈白边（登录小窗没有）。
+
+**根因**：`window_manager` 的 `TitleBarStyle.hidden` 在 `WM_NCCALCSIZE` 里把左右下各留 8px 非客户区当缩放边框。Win10 上这圈被 DWM 画成透明；**Windows 7 Aero 会把它当实体边框画出来**（白边）。登录小窗原本就在 `WM_NCCALCSIZE` 里 `return 0`，所以没白边。
+
+| 项 | 做法 | 文件 |
+|---|---|---|
+| `WM_NCCALCSIZE` | 非最大化一律 `return 0`（原来只对登录圆角窗）；最大化/全屏仍交给 `window_manager` | `windows/runner/flutter_window.cpp` |
+| 边缘缩放 | `ResizeHitTest`：窗口可缩放（`WS_THICKFRAME`）且未最大化时，边缘 6px（按 DPI 缩放）返回 `HTLEFT`/`HTBOTTOMRIGHT` 等 | 同上 |
+| Flutter 子窗口 | 子窗口铺满整窗，边缘的 `WM_NCHITTEST` 返回 `HTTRANSPARENT` 交给父窗口 | 同上 `ViewWindowProc` |
+
+#### 主界面尺寸 → 默认 827x604，记住拖拽后的大小（2026-11-25）
+
+原来主界面每次都强制 910x620，也不记忆。现在：
+
+- `WindowProps` 默认宽高改为 827x604（对齐 Bettbox 新版实际使用的尺寸）。改了 `lib/models/config.dart`，同时手改了 `generated/config.freezed.dart` 和 `generated/config.g.dart` 里的默认值，没有重跑 build_runner。
+- `lib/common/window.dart` `showAsMainWindow()` 按 `windowProps` 的宽高打开。小于最小尺寸 380x400（例如旧版拖登录窗存下的 360x420）或等于旧版强制写入的 910x620 时，按默认 827x604 打开。
+- `lib/manager/window_manager.dart` `_scheduleWindowGeometryCapture`：登录窗阶段（`panelUnlocked` 为 false）或尺寸小于主界面最小尺寸时不保存，避免登录小窗覆盖主界面的尺寸和位置。
+
+#### 同步 mihomo 内核到上游 v1.20.1（2026-11-25）
+
+只换内核，界面和功能保持 1.19.7 状态。
+
+- `core/Clash.Meta` 整个目录替换成上游 main（v1.20.1，`bd94edb9`）的版本（先 `git rm -r` 再 `git checkout main -- core/Clash.Meta`，确保上游删掉的文件也删掉）。
+- `core/go.mod` / `core/go.sum` 由 `go mod tidy` 按新内核升级依赖，保留 Gamebox 原有的 `go 1.20` 和 `replace`。
+- 桥接层只改了一处：`core/hub.go` 删掉 `executor.DefaultProviderLoadedHook` 赋值。上游删除了这个变量；旧内核里它只是声明，从未被调用，删掉不改变行为。
+- `core/action.go`、`core/toolbox/`、`lib*.go` 等 Gamebox 改动全部保留，没有引入上游新的桥接功能。
+- 验证：`go build` / `go vet` 通过；`go test .` 通过；`core/toolbox` 的 `TestQuicClientRoundTrip` 在旧内核上同样失败（本机回环 rtt=0），`TestSpeedTesterRunsAllPhases` 偶发超时，单独重跑新旧内核都通过。
+
 ### 3.16 托盘退出通知面板下线（修在线设备不立即归零）
 
 | 项 | 改前 | 改后 |
@@ -697,6 +769,13 @@ tickPanelSessionHeartbeat 比对 session.lastSeenProfileRevision
 **rebase 注意点**:
 - upstream 如果新增其它进程退出入口(`SIGTERM` 处理器 / `--exit` IPC / 「关闭」窗口按钮 等),**都应**调用 `globalState.clearPanelSubscriptions`,不要直接 `system.exit`
 - upstream 如果重构 `_serverLogout` 或 `clearPanelDataOnExit`,**保留 `[Gamebox]` 标记和 `await` 语义**
+
+#### 心跳中断不再把客户踢回登录窗（2026-11-25）
+
+现象：面板在线设备偶尔变 0，但客户节点照常在用。原因是面板闲置窗口 120 秒、客户端 60 秒一次心跳，连续 2 次心跳没送达（网络抖动），面板每分钟的清理任务就把会话结束；下一次心跳拿到 `401 session_ended`，客户端立刻回登录窗。
+
+- 面板（mini-panel）：会话新增 `end_reason` 列，闲置结束记 `idle`。Bearer 请求（含 `/v1/me` 心跳）遇到 `idle` 结束的会话，只要设备名额没被别的设备占满就原地恢复，不再返回 401。登出、踢号、改密、重置订阅/用户会清掉 `idle`，这些会话不可恢复。闲置窗口默认改为 300 秒。登录限流改为按真实客户 IP（`ClientIp`）每分钟 60 次 + 每账号每 5 分钟 30 次。
+- 客户端 `lib/panel/panel_auth.dart`：心跳拿到 `session_ended` / `session_idle_expired` 时，先用「记住的密码」在后台重新登录换 token（`_trySilentRelogin`），不回登录窗、不动代理；没记住密码才立即回登录窗，连续失败 3 次也会回登录窗。`session_revoked*` / `invalid_token` 仍立即回登录窗。
 
 ---
 
@@ -985,6 +1064,10 @@ const List<DashboardWidget> defaultAndroidDashboardWidgets = [
 
 ### 3.19 安卓端默认开关调整（4 项，2026-10-20）
 
+> ⚠️ **2026-10-25 更新**：第 1 项「查找进程」已**移出**本节 —— 它不再是「Android 专用默认」，
+> 而是改成了**全局默认 `always`**（见 §3.21「查找进程默认开启」）。
+> 因此本节现在实际只有 **3 项** Android 专用默认。表格保留第 1 项以便追溯。
+
 | # | 设置 | UI 路径 | 全局默认 | 安卓默认 | 实际行为说明 |
 |---|---|---|---|---|---|
 | 1 | **查找进程** | 内核配置 → 常规 → 查找进程 | `FindProcessMode.always`（开） | `always`（开） | `ClashConfig.findProcessMode`。**2026-10-25 起改为全局默认开启**（见 §3.21 附带修复）。mihomo 在 `find-process-mode=off` 时会把 `helper.FindProcess` 置空 → `metadata.Process` 永远为空 → **PROCESS-NAME / PROCESS-PATH 规则无法匹配**，流量静默落到后面的规则 |
@@ -1042,7 +1125,7 @@ const List<DashboardWidget> defaultAndroidDashboardWidgets = [
 
 - upstream 改了 `VpnProps` 默认值（任何字段），都要重新核对 `VpnProps.safeFromJson` 里 `defaultVpnProps.copyWith(...)` 跟上游是否对齐（防止漏新字段）
 - upstream 给 `clash_config.dart` 加了新的 `FindProcessMode` 值，也要核对 `safeFormJson` 的兜底分支行为
-- 4 个开关的 Android 专用默认都是「用户偏好」，将来想改回上游默认值时，把这段 `if (system.isAndroid)` 条件删掉即可
+- 3 个开关的 Android 专用默认都是「用户偏好」，将来想改回上游默认值时，把这段 `if (system.isAndroid)` 条件删掉即可
 - **「查找进程」已不是「Android 专用默认」** —— 2026-10-25 起它是**全局默认 `always`**（§3.21）。上游若改成 `off`，Gamebox 要重新评估 PROCESS-NAME 规则是否还生效
 
 ---
@@ -1117,12 +1200,12 @@ flutter analyze --no-pub
 | 项 | 结果 |
 |---|---|
 | `git diff --diff-filter=U` | 0（无未解决冲突） |
-| **`core/` vs 上游** | **完全一致（1096 文件逐字节相同）→ 内核已同步到 v1.19.33** |
+| **`core/` vs 上游** | 当时**完全一致**（1096 文件逐字节相同）→ 内核已同步到 v1.19.33<br>⚠️ **2026-10-25 起不再一致**：§3.21 的 5 个 Go 文件有 Gamebox 定制（见下方「core/ 定制化现状」）|
 | `flutter analyze` | **0 error** / **4 warning**（与基线一致，详见下方「4 个 warning 明细」）|
 | `flutter test` | **13 failing**（修 `AppPath.downloadDir` 前是 **16 failing** → 该修复顺带救回 3 个被未捕获异常连累的既有测试）|
 | 新增回归测试 | `test/views/panel_login_layout_test.dart`（4 条）、`test/common/app_path_download_dir_test.dart`（1 条），全过 |
 | `main` vs `upstream/main` | **完全一致**（`1fb8806f` / `1fb8806f`，0-0）；已 `git fetch upstream main` 刷新过引用 |
-| `[Gamebox]` 标记总数 | 225 |
+| `[Gamebox]` 标记总数 | 226 行（`grep -rn "\[Gamebox\]" lib/ windows/ arb/ \| wc -l`；2026-10-25 起为 **228** 行）|
 | 42 项定制逐项比对（合并前 vs 合并后）| **38 项 INTACT，0 项 LOST** |
 
 #### 4 个 warning 明细（长期基线，非 Gamebox 引入）
@@ -1148,19 +1231,40 @@ flutter analyze --no-pub
 
 #### 内核同步核对（Mihomo v1.19.33）
 
-Gamebox 对 `core/` **零定制** —— 内核是 in-tree vendored（仓库无 `.gitmodules`，`core/Clash.Meta` 也不是独立 git 仓库），
-所以"内核有没有更新"完全取决于上游那 1096 个文件的树有没有被完整带过来。
+Gamebox 对 `core/` 的定制**极少** —— 内核是 in-tree vendored（仓库无 `.gitmodules`，`core/Clash.Meta` 也不是独立 git 仓库），
+所以"内核有没有更新"主要取决于上游那 1096 个文件的树有没有被完整带过来。
+
+> ⚠️ **2026-10-25 更新**：不再是「零定制」。§3.21 改了 5 个 Go 文件（`core/action.go` 等），
+> `git diff upstream/main -- core/` 现在**有 5 个文件差异**（见下方「core/ 定制化现状」）。
+> 核对的正确姿势变成：**先确认差异只有这 5 个已知文件**，再看 `core/Clash.Meta/` 是否一致。
 
 | 核对点 | 结果 |
 |---|---|
-| `git diff HEAD upstream/main -- core/` | **空**（逐字节一致）|
-| 文件数 | 1096 = 1096 ✅ |
+| `git diff HEAD upstream/main -- core/` | **5 个文件**（§3.21 的 Gamebox 定制，非上游差异）—— 见下方 |
+| `git diff HEAD upstream/main -- core/Clash.Meta/` | **空**（逐字节一致）✅ |
 | `core/Clash.Meta/go.mod` | 与上游一致 ✅ |
+| v1.19.33 新特性抽查 | TUN `dns-mode`（`TunDnsMode`）✅；`core/toolbox/` 全套 iPerf3/STUN/speedtest/route-trace 端点 ✅ |
+
+##### core/ 定制化现状（2026-10-25 起）
+
+`git diff upstream/main -- core/` 的**全部**差异，必须始终等于这 5 个文件：
+
+| 文件 | 定制内容 | 章节 |
+|---|---|---|
+| `core/action.go` | `default:` 分支回 `unknown method` 错误；`result` 改指针传递 | §3.21 |
+| `core/lib.go` | `invokeAction` 传 `&result` | §3.21 |
+| `core/lib_android.go` | `nextHandle` 的 `result` 改指针 | §3.21 |
+| `core/lib_other.go` | `nextHandle` 的 `result` 改指针 | §3.21 |
+| `core/server.go` | `startServer` 传 `&result`；`nextHandle` 的 `result` 改指针 | §3.21 |
+
+> ⚠️ **同步上游时如果这 5 个文件也报冲突**：说明上游改了同一处。
+> 优先保留 Gamebox 的指针传递写法（`result` 是值接收者时不改指针，
+> `default:` 分支的错误**回不到调用方**，Dart 侧会永久转圈 —— 见 §3.21）。
 | v1.19.33 新特性抽查 | TUN `dns-mode`（`TunDnsMode`）✅；`core/toolbox/` 全套 iPerf3/STUN/speedtest/route-trace 端点 ✅ |
 
 > ⚠️ **内核版本号在源码里查不到**：`core/Clash.Meta/constant/version.go` 是 `Version = ""`，
 > 真正的版本号在构建时通过 `-ldflags` 注入（`setup.dart` 的 `buildCore`）。
-> 想确认"跑起来的是不是 v1.19.33"，要么比对 `core/` 整棵树，要么看运行时的内核版本输出。
+> 想确认"跑起来的是不是 v1.19.33"，要么比对 `core/Clash.Meta/` 整棵树，要么看运行时的内核版本输出。
 
 #### v1.19.7 更新日志逐条核对
 
@@ -1207,13 +1311,14 @@ Unix socket 名、polkit 规则文件名、salt、`BettboxCore.exe` 二进制名
 |---|---|
 | 源码来源 | `core/`（内含 vendored 的 `core/Clash.Meta`），随仓库一起 merge，**不是 submodule、不联网下载** |
 | 编译时机 | 打包时 `setup.dart` 调 `Build.buildCore()` → `go build`（`-tags` / `-trimpath` / `-ldflags`），产物落到 `libclash/<target>/<arch>/` |
+| **产物不入库** | `libclash/` 在 `.gitignore` 里（见 §3.21）—— 每次 clone / 换机器**必须自己重编一次**，否则跑的是旧内核（工具箱会永久转圈）|
 | 命名 | `Build.coreName = '${identityName}Core'` —— 靠 `AppIdentity` 参数化成 **`GameboxCore`**（上游是 `BettboxCore`），见 §3.16 |
 | 进包 | 桌面端 `appPath.bundledCorePath` 从可执行文件同目录取 `${coreExecutableName}.exe`；Linux AppImage 走 `ensureAppImageCoreSynced()` 拷到外部目录（带 `.core_stamp` 做 mtime/size 戳）|
 | 启动 | `lib/clash/service.dart` 用 `Process.start(appPath.corePath, ...)` 起**独立进程**（Windows 走 helper 服务的 `startCore`）；移动端才用 FFI `libmeta.so` |
 | 版本号 | 构建时 `-ldflags` 注入，源码里查不到（见上文 core 核对说明）|
 
-> 所以"内核是否同步到 v1.19.33"取决于**仓库里 `core/` 源码是否与上游一致**，
-> 只要 `git diff HEAD upstream/main -- core/` 为空，打出来的 `GameboxCore.exe` 就是 v1.19.33。
+> 所以"内核是否同步到 v1.19.33"取决于**仓库里 `core/Clash.Meta/` 源码是否与上游一致**，
+> 只要 `git diff HEAD upstream/main -- core/Clash.Meta/` 为空，打出来的 `GameboxCore.exe` 就是 v1.19.33。
 > 反过来说，**不要从任何地方单独拷一个 `*Core.exe` 进仓库** —— 那会绕过源码、绕过 `-ldflags`、也过不了 §3.16 的命名检查。
 
 ---
@@ -1250,7 +1355,7 @@ dart setup.dart android --arch arm64 --out core
 > ⚠️ **环境坑**：如果系统环境变量 `GO111MODULE=off`，`go mod tidy` 会直接失败
 > （`go: modules disabled by GO111MODULE=off`），构建中断。构建前临时设 `GO111MODULE=on`。
 
-**改动明细**（源码改动极小，共 6 个文件）：
+**改动明细**（源码 8 个文件 + 2 个生成文件 + 本文档，共 11 个）：
 
 | 文件 | 改动 | 目的 |
 |---|---|---|
@@ -1258,9 +1363,34 @@ dart setup.dart android --arch arm64 --out core
 | `core/action.go` / `core/lib.go` / `core/lib_android.go` / `core/lib_other.go` / `core/server.go` | `handleAction` / `nextHandle` 的 `result` 参数从值传递改为**指针**（`*ActionResult`）| `ActionResult.send()` 是值接收者，原写法下 `default:` 分支即使调 `result.error()` 也**回不到调用方**。改成指针后错误才真正发得出去 |
 | `lib/clash/core.dart` | 新增 `_tryDecode()`；`_toolboxJson` / `getCoreStatus` / `startSpeedTest` / `probeSpeedTest` / `getSpeedTestServers` / `startStunTest` / `startIperfServer` / `startIperfClient` / `startLocalPing` 全部改用它 | 内核返回非 JSON（如 `unknown method: xxx`）时 `json.decode` 抛 `FormatException`，异常打断调用方 `await`，loading 标志来不及复位 → **同样表现为转圈**。现在解析失败返回 `null` / `{'error': ...}`，页面能显示错误 |
 | `lib/common/path.dart` | 新增 `_existingOrCopied()` / `_resolveBundled()`；`bundledCorePath` / `helperPath` 改用它们 | 见下方「Dev→Release 回退」 |
+| `lib/models/clash_config.dart` | `findProcessMode` 的 `@Default` 由 `off` 改为 `always`（所有平台）；`safeFormJson` 兜底统一走 `defaultClashConfig` | 见下方「查找进程默认开启」 |
+| `lib/models/generated/clash_config.{freezed,g}.dart` | 由 `build_runner` 重新生成 | 生成代码，**不要手工改**（见 §3.20）|
 
-> `core/action.go` 的 `default:` 分支改动**不改变上游行为** —— 上游对已知方法的处理完全没动，
-> 只是把「未知方法静默丢弃」补成「回一个明确的错误」。这是本项目**唯一**的 Go 侧逻辑改动。
+> `core/action.go` 的 `default:` 分支改动**不改变上游对已知方法的处理** —— 上游逻辑完全没动，
+> 只是把「未知方法静默丢弃」补成「回一个明确的错误」。这是本项目**唯一的 Go 侧行为逻辑改动**，
+> 其余 4 个 Go 文件只是把 `result` 改成指针传递的机械改动。
+
+#### 查找进程默认开启（`lib/models/clash_config.dart`）
+
+**改动**：`@Default(FindProcessMode.off)` → `@Default(FindProcessMode.always)`，**所有平台**统一。
+
+**原因**：mihomo 在 `find-process-mode=off` 时会把 `helper.FindProcess` 置空 →
+`metadata.Process` 永远为空 → **PROCESS-NAME / PROCESS-PATH 规则无法匹配**，
+流量会静默落到后面的规则（见 `core/Clash.Meta/tunnel/tunnel.go` 的 `FindProcessMode()` switch）。
+用 `always` 而不是 `strict`：上游 Dart 侧用的就是 `always`，
+且 `always` 与 `strict` 的 PROCESS-NAME 规则都生效，区别只在查进程的时机。
+
+**影响面**：
+- §3.19 原先把它列为「4 个 Android 专用默认开关」之一，现已**移出**（不再是平台分叉，是全局默认）
+- §3.3 的「查找进程 = 开启」记录本来就是对的，本次只是把**实现**对齐到该记录
+- **老用户不受影响** —— `safeFormJson` 只在 `json == null`（全新安装）时用默认值，
+  升级用户 config.json 里已有 `find-process-mode`，保留原值
+
+#### ⚠️ `core/` 不再与上游逐字节一致
+
+本次改了 5 个 Go 文件，所以 **`git diff upstream/main -- core/` 现在有差异了** —— 这**不**代表内核没同步。
+正确的核对姿势见 §3.20「core/ 定制化现状」：
+`git diff upstream/main -- core/Clash.Meta/` 仍应为**空**（真正的上游内核树一致）。
 
 #### Dev→Release 内核回退（`lib/common/path.dart`）
 
@@ -1287,9 +1417,13 @@ dart setup.dart android --arch arm64 --out core
 | Android `go vet`（android/arm64 交叉编译）| 通过 ✅ |
 | Windows `go build`（CGO_ENABLED=0）| 通过 ✅ |
 | `gofmt`（改动的 Go 文件）| 通过 ✅ |
-| `flutter analyze` | **0 error** ✅ |
+| `flutter analyze` | **0 error** / **4 warning**（与基线一致）✅ |
 | `flutter test` 全量 | **13 failing** —— 与基线**完全相同**（media_unlock / script / vpn_props / code_forge，均为既有失败）✅ |
+| `build_runner build` 重跑 | **无变化** → 生成代码与源文件同步 ✅ |
 | APK 内 `lib/arm64-v8a/libmeta.so` | 75816904 字节，工具箱符号齐全 ✅ |
+| `git diff upstream/main -- core/` | **恰好 5 个文件**（就是「core/ 定制化现状」那张表）✅ |
+| `git diff upstream/main -- core/Clash.Meta/` | **空** ✅ |
+| `[Gamebox]` 标记行数 | `lib/ windows/ arb/`：**226 → 228** 行；`core/`：**0 → 1** 行（`core/action.go:380`）。<br>⚠️ §2.4 的扫描命令**不含 `core/`** —— 要一起查就加 `core/` 进去 |
 
 > **符号扫描要用 Go 符号名，不能用方法名字符串** ——
 > Go 编译器会把短字符串内联进指令流，`routeTrace` 这类方法名常量**不一定**以字面量出现在二进制里，
@@ -1404,6 +1538,15 @@ flutter build windows --release --dart-define=APP_ENV=stable
 flutter build windows --release --dart-define=APP_ENV=stable --no-pub
 ```
 
+> ⚠️ **改了 `core/` 源码后必须先重编内核**，否则打出来的包跑的是旧内核：
+>
+> ```bash
+> dart setup.dart windows --arch amd64 --out core
+> ```
+>
+> 安卓同理（`dart setup.dart android --arch arm64 --out core`）。
+> 详见 §3.21 —— 这正是工具箱永久转圈的根因。
+
 ### 8.3 验证清单（打包后必查）
 
 1. 冷启动看到登录小窗（`PanelLoginGate`）
@@ -1412,13 +1555,15 @@ flutter build windows --release --dart-define=APP_ENV=stable --no-pub
 2b. 顶部 28px 区域可拖动窗口；安卓端这三个按钮与拖动都不出现
 2c. 登录小窗内容**固定不可滚动**，也没有右侧滚动条；
     「登录」/「确认修改」按钮完整可见（不出现黄黑 overflow 条）
-2. 登录后看到首页（`HomePage`）
-3. 侧边栏/悬浮面板**没有**「备份与恢复」入口
-4. 设置 → 关于页是 **Gamebox** 而不是 Bettbox
-5. 8 项定制默认值（深色/中文/UA 等）符合 §3 预期
-6. 任务管理器看进程名是 `Gamebox.exe` 不是 `Bettbox.exe`
-7. 安装路径是 `C:\Program Files\Gamebox` 不是 `C:\Program Files\Bettbox`
-8. 控制面板卸载列表是 `Gamebox`
+2d. **工具箱任一功能能正常返回结果**（网速测试 / 路由追踪 / DNS 查询 / MRS 速查 / iPerf3 / STUN / 本地 Ping / age 加密）。
+    **一直转圈 = 内核没重新编译**，见 §3.21
+3. 登录后看到首页（`HomePage`）
+4. 侧边栏/悬浮面板**没有**「备份与恢复」入口
+5. 设置 → 关于页是 **Gamebox** 而不是 Bettbox
+6. 8 项定制默认值（深色/中文/UA 等）符合 §3 预期
+7. 任务管理器看进程名是 `Gamebox.exe` 不是 `Bettbox.exe`
+8. 安装路径是 `C:\Program Files\Gamebox` 不是 `C:\Program Files\Bettbox`
+9. 控制面板卸载列表是 `Gamebox`
 
 ### 8.4 发布流程
 
@@ -1489,7 +1634,27 @@ flutter build windows --release --dart-define=APP_ENV=stable
 # 3. 侧边栏/悬浮面板没有"备份与恢复"入口
 # 4. 设置 → 关于页是 Gamebox 而不是 Bettbox
 # 5. 8 项定制默认值（深色/中文/UA 等）符合预期
+# 6. 工具箱任一功能能返回结果（转圈 = 内核没重编，见 §3.21）
 ```
+
+**安卓端**（工具箱走 FFI，与桌面端的 RPC 通道不同，需单独验证）：
+
+```bash
+# 重编安卓内核
+dart setup.dart android --arch arm64 --out core
+
+# 打包并装机
+flutter build apk --debug --target-platform android-arm64
+```
+
+| 验证项 | 说明 |
+|---|---|
+| 工具箱 8 项功能 | 网速测试 / 路由追踪 / DNS 查询 / MRS 速查 / iPerf3 / STUN / 本地 Ping / age 加密，**均能返回结果而不是转圈** |
+| APK 内核 | `lib/arm64-v8a/libmeta.so` 已更新（`unzip -l` 看时间戳/大小） |
+| 代理功能 | TUN 正常启停，流量走代理 |
+
+> ⚠️ 安卓的 `libmeta.so` 是 **Gradle `preBuild` 阶段**从 `libclash/android/` 拷进
+> `android/core/src/main/jniLibs/` 的 —— 所以**必须先重编内核再 build apk**，顺序反了就会打进旧内核。
 
 ---
 

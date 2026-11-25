@@ -1380,6 +1380,7 @@ final forceCheck =
 
   Future<void> init() async {
     FlutterError.onError = (details) {
+      startupTrace('FlutterError: ${details.exceptionAsString()}\n${details.stack}');
       if (kDebugMode) {
         FlutterError.dumpErrorToConsole(details);
       }

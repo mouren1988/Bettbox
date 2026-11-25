@@ -390,6 +390,10 @@ Future<_PanelSession> _login(String identifier, String password) async {
     if (res.status == 404) {
       return _loginLegacy(id, password);
     }
+    // [Gamebox] 面板限流。再试邮箱只会多吃一次额度，直接停。
+    if (res.status == 429) {
+      throw Exception('登录尝试过于频繁，请稍后再试');
+    }
     Object? parsed;
     try {
       parsed = jsonDecode(res.text);
@@ -927,6 +931,7 @@ Future<_PanelMeProbe> _probePanelMe(_PanelSession session) async {
         err = (parsed['error'] as String).trim();
       }
     } catch (_) {}
+    _traceHeartbeatFailure('HTTP 401 $err');
     return _PanelMeProbe(
       ok: false,
       unauthorized: true,
@@ -934,6 +939,7 @@ Future<_PanelMeProbe> _probePanelMe(_PanelSession session) async {
     );
   }
   if (res.status < 200 || res.status >= 300) {
+    _traceHeartbeatFailure('HTTP ${res.status} ${_httpFailure(res.status, res.text, _legacyMe)}');
     return const _PanelMeProbe(ok: false, unauthorized: false);
   }
   // [Gamebox] 解析响应体里的 user.profile_revision；解析失败当 null,
@@ -989,6 +995,43 @@ Future<void> forcePanelReloginFromServer() async {
 
 int _heartbeatUnauthorizedStreak = 0;
 
+// [Gamebox] 会话因心跳中断被面板结束（不是踢号/改密）：用记住的密码在后台重新拿 token，
+// 不回登录窗、不动代理，客户游戏不掉线。没记住密码或连续失败才回登录窗。
+const _silentReloginErrors = {'session_ended', 'session_idle_expired'};
+const _silentReloginMaxFailures = 3;
+int _silentReloginFailures = 0;
+
+enum _SilentRelogin { ok, failed, unavailable }
+
+Future<_SilentRelogin> _trySilentRelogin(_PanelSession session) async {
+  final remembered = await loadRememberedPanelLogin();
+  if (remembered == null ||
+      remembered.username.trim().toLowerCase() !=
+          session.username.trim().toLowerCase()) {
+    return _SilentRelogin.unavailable;
+  }
+  try {
+    final fresh = await _login(remembered.username, remembered.password);
+    await _saveSession(_PanelSession(
+      authData: fresh.authData,
+      subscribeToken: fresh.subscribeToken,
+      username: fresh.username,
+      lastSeenProfileRevision: session.lastSeenProfileRevision,
+    ));
+    startupTrace('heartbeat: silent relogin ok');
+    return _SilentRelogin.ok;
+  } catch (e) {
+    _traceHeartbeatFailure('silent relogin: $e');
+    return _SilentRelogin.failed;
+  }
+}
+
+// [Gamebox] 面板在线数掉 0 排查：心跳失败写进 startup.log 和应用日志，成功不记。
+void _traceHeartbeatFailure(String reason) {
+  startupTrace('heartbeat failed: $reason');
+  commonPrint.warn('[Heartbeat] failed: $reason');
+}
+
 // [Gamebox] 会话心跳：GET /v1/me，仅走 _directClient。
 Future<void> tickPanelSessionHeartbeat() async {
   if (!globalState.panelUnlocked.value) {
@@ -1003,12 +1046,28 @@ Future<void> tickPanelSessionHeartbeat() async {
   late final _PanelMeProbe probe;
   try {
     probe = await _probePanelMe(session);
-  } catch (_) {
+  } catch (e) {
     // 离线/超时：不累计 401，也不清会话。
+    _traceHeartbeatFailure('$e');
     return;
   }
   if (probe.unauthorized) {
     _heartbeatUnauthorizedStreak += 1;
+    if (_silentReloginErrors.contains(probe.unauthorizedError?.trim())) {
+      _heartbeatUnauthorizedStreak = 0;
+      final outcome = await _trySilentRelogin(session);
+      if (outcome == _SilentRelogin.ok) {
+        _silentReloginFailures = 0;
+        return;
+      }
+      if (outcome == _SilentRelogin.failed) {
+        _silentReloginFailures += 1;
+        if (_silentReloginFailures < _silentReloginMaxFailures) return;
+      }
+      _silentReloginFailures = 0;
+      await forcePanelReloginFromServer();
+      return;
+    }
     if (_isImmediateReauthError(probe.unauthorizedError) ||
         _heartbeatUnauthorizedStreak >= 2) {
       _heartbeatUnauthorizedStreak = 0;
@@ -1017,6 +1076,7 @@ Future<void> tickPanelSessionHeartbeat() async {
     return;
   }
   _heartbeatUnauthorizedStreak = 0;
+  _silentReloginFailures = 0;
 
   // [Gamebox] 管理端抬 profile_revision 后,心跳静默同步订阅。
   // - remote == null:响应没拿到 revision,跳过（不要乱拉）

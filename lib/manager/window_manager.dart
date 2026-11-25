@@ -56,6 +56,11 @@ class _WindowContainerState extends ConsumerState<WindowManager>
         return;
       }
       if (!bounds.left.isFinite || !bounds.top.isFinite) return;
+      // [Gamebox] 登录小窗的尺寸和位置不能覆盖主界面记住的值。
+      if (!globalState.panelUnlocked.value ||
+          !Window.isMainWindowSize(bounds.size)) {
+        return;
+      }
 
       ref
           .read(windowSettingProvider.notifier)
